@@ -462,6 +462,9 @@ $("only-mine").addEventListener("change", (e) => {
   render();
 });
 
+setupPasswordDialog($("pw-dialog"), $("btn-password"));
+$("pw-dialog").querySelector("[data-close]").addEventListener("click", () => $("pw-dialog").close());
+
 $("btn-logout").addEventListener("click", async () => {
   try { await api("POST", "/api/logout"); } finally { location.href = "/login"; }
 });

@@ -6,7 +6,7 @@ import secrets
 import sqlite3
 from pathlib import Path
 
-DB_PATH = Path(os.environ.get("KAL_DB", Path(__file__).resolve().parent.parent / "data" / "kalender.db"))
+DB_PATH = Path(os.environ["APP_DATA"]) / "kalender.db"
 
 SCHEMA = """
 PRAGMA foreign_keys = ON;
@@ -65,7 +65,6 @@ CREATE TRIGGER IF NOT EXISTS ver_marks_delete AFTER DELETE ON marks BEGIN UPDATE
 
 
 def connect() -> sqlite3.Connection:
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(DB_PATH)
     con.row_factory = sqlite3.Row
     con.execute("PRAGMA foreign_keys = ON")
@@ -74,6 +73,7 @@ def connect() -> sqlite3.Connection:
 
 
 def init_db() -> None:
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     with connect() as con:
         con.executescript(SCHEMA)
 

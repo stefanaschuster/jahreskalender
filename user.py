@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Benutzerverwaltung für den Jahreskalender (nur auf dem Server).
+"""Benutzerverwaltung für den Jahreskalender auf der Kommandozeile (selbst gehostet).
+Alternativ: Admin-Seite im Browser.
 
   python3 user.py add <name> [--admin]   Benutzer anlegen (Passwort wird abgefragt)
   python3 user.py passwd <name>          Passwort ändern (meldet alle Sitzungen ab)
@@ -10,12 +11,15 @@
 """
 import argparse
 import getpass
+import os
 import re
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from app import db  # noqa: E402
+ROOT = Path(__file__).resolve().parent
+os.environ.setdefault("APP_DATA", str(ROOT / "data"))
+sys.path.insert(0, str(ROOT / "code"))
+import db  # noqa: E402
 
 NAME_RE = re.compile(r"^[A-Za-z0-9._-]{2,64}$")
 

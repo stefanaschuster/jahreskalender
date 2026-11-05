@@ -13,6 +13,13 @@ const ACTIONS = {
   event_geaendert: ["Event geändert", "edit"],
   event_geloescht: ["Event gelöscht", "bad"],
   status: ["Status gesetzt", "edit"],
+  passwort_geaendert: ["Eigenes Passwort geändert", "edit"],
+  passwort_fehlgeschlagen: ["Passwortänderung fehlgeschlagen", "bad"],
+  benutzer_angelegt: ["Benutzer angelegt", "edit"],
+  benutzer_passwort: ["Passwort gesetzt", "edit"],
+  benutzer_rolle: ["Rolle geändert", "edit"],
+  benutzer_abgemeldet: ["Benutzer abgemeldet", ""],
+  benutzer_geloescht: ["Benutzer gelöscht", "bad"],
 };
 const PAGE = 200;
 const LIVE_MS = 10000;
@@ -24,9 +31,15 @@ async function api(url, opts = {}) {
   const res = await fetch(url, { headers: { "Content-Type": "application/json" }, ...opts });
   if (res.status === 401) { location.href = "/login"; throw new Error("401"); }
   if (res.status === 403) { location.href = "/"; throw new Error("403"); }
-  if (!res.ok) throw new Error(`Fehler ${res.status}`);
+  if (!res.ok) {
+    let msg = `Fehler ${res.status}`;
+    try { const j = await res.json(); if (typeof j.detail === "string") msg = j.detail; } catch {}
+    throw new Error(msg);
+  }
   return res.json();
 }
+const send = (url, method, body) => api(url, { method, body: JSON.stringify(body || {}) });
+let me = null;
 
 // DB speichert UTC "YYYY-MM-DD HH:MM:SS" → lokale Zeit
 function fmtTs(ts) {
@@ -71,13 +84,89 @@ async function loadUsers() {
       [u.geplant, "num"], [u.gebucht, "num"], [u.events, "num"], [u.actions, "num"],
     ];
     for (const [text, cls] of cells) tr.append(el("td", cls, String(text)));
+    tr.append(manageCell(u));
     tr.title = `angelegt ${fmtTs(u.created_at)}`;
     tb.append(tr);
   }
   sel.value = cur;
 }
 
+function manageCell(u) {
+  const td = el("td", "nowrap manage");
+  const self = me && u.id === me.id;
+  const b = (label, action, cls) => { const x = el("button", `btn small ${cls || ""}`, label); x.type = "button"; x.dataset.action = action; td.append(x); return x; };
+  b("Passwort", "pw");
+  b(u.is_admin ? "Admin entziehen" : "Zum Admin", "role").disabled = self && u.is_admin;
+  b("Abmelden", "logout").disabled = !u.sessions;
+  b("Löschen", "del", "danger").disabled = self;
+  td.dataset.name = u.username;
+  td.dataset.admin = u.is_admin ? "1" : "";
+  return td;
+}
+
+async function manage(action, id, name, isAdmin) {
+  try {
+    if (action === "pw") return openUserDialog({ id, name });
+    if (action === "role") {
+      await send(`/api/admin/users/${id}/admin`, "PUT", { is_admin: !isAdmin });
+    } else if (action === "logout") {
+      await send(`/api/admin/users/${id}/logout`, "POST");
+    } else if (action === "del") {
+      if (!confirm(`„${name}“ wirklich löschen? Markierungen des Benutzers gehen verloren.`)) return;
+      await send(`/api/admin/users/${id}`, "DELETE");
+    }
+    await loadUsers();
+    await pollNew();
+  } catch (err) { alert(err.message); }
+}
+
+/* Dialog: neuer Benutzer bzw. Passwort setzen */
+let editing = null;
+function openUserDialog(target) {
+  editing = target || null;
+  const f = $("user-form");
+  f.reset();
+  $("user-error").hidden = true;
+  $("user-heading").textContent = editing ? `Passwort für ${editing.name}` : "Neuer Benutzer";
+  $("user-name-label").hidden = !!editing;
+  f.username.required = !editing;
+  $("user-admin-label").hidden = !!editing;
+  $("user-dialog").showModal();
+  (editing ? f.password : f.username).focus();
+}
+function genPassword() {
+  const a = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const r = crypto.getRandomValues(new Uint32Array(14));
+  return Array.from(r, (n) => a[n % a.length]).join("");
+}
+$("btn-add-user").addEventListener("click", () => openUserDialog());
+$("user-close").addEventListener("click", () => $("user-dialog").close());
+$("user-gen").addEventListener("click", () => { $("user-form").password.value = genPassword(); });
+$("user-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = e.target;
+  try {
+    if (editing) {
+      await send(`/api/admin/users/${editing.id}/password`, "PUT", { password: f.password.value });
+    } else {
+      await send("/api/admin/users", "POST", { username: f.username.value.trim(), password: f.password.value, is_admin: f.is_admin.checked });
+    }
+    $("user-dialog").close();
+    await loadUsers();
+    await pollNew();
+  } catch (err) {
+    $("user-error").textContent = err.message;
+    $("user-error").hidden = false;
+  }
+});
+
 $("users").addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-action]");
+  if (btn) {
+    const td = btn.closest("td"), tr = btn.closest("tr");
+    manage(btn.dataset.action, tr.dataset.id, td.dataset.name, !!td.dataset.admin);
+    return;
+  }
   const tr = e.target.closest("tr[data-id]");
   if (!tr) return;
   $("f-user").value = tr.dataset.id;
@@ -158,7 +247,7 @@ $("btn-logout").addEventListener("click", async () => {
 });
 
 (async function init() {
-  const me = await api("/api/me");
+  me = await api("/api/me");
   $("username").textContent = `${me.username} (Admin)`;
   await loadUsers();
   await reloadLog();
