@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin · Jahreskalender</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="topbar">
+  <h1>Admin</h1>
+  <a class="btn" href="/">← Kalender</a>
+  <div class="userbox">
+    <span id="username"></span>
+    <button class="btn" id="btn-logout">Abmelden</button>
+  </div>
+</header>
+
+<main class="admin">
+  <section>
+    <h2>Benutzer</h2>
+    <div class="table-wrap">
+      <table class="data" id="users">
+        <thead>
+          <tr>
+            <th>Name</th><th>Rolle</th><th class="num">Logins</th><th>Letzter Login</th><th>Zuletzt aktiv</th>
+            <th class="num">Sitzungen</th><th class="num">Geplant</th><th class="num">Gebucht</th>
+            <th class="num">Events angelegt</th><th class="num">Aktionen</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p class="muted small">Klick auf einen Benutzer filtert das Protokoll. Benutzer verwalten: <code>python3 user.py</code></p>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>Aktivität</h2>
+      <div class="filters">
+        <select id="f-user"><option value="">Alle Benutzer</option></select>
+        <select id="f-action"><option value="">Alle Aktionen</option></select>
+        <label class="toggle"><input type="checkbox" id="f-live" checked> live</label>
+        <button class="btn" id="btn-refresh">Aktualisieren</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="data" id="log">
+        <thead><tr><th>Zeit</th><th>Benutzer</th><th>Aktion</th><th>Details</th><th>IP</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p class="muted small" id="log-empty" hidden>Keine Einträge.</p>
+    <button class="btn" id="btn-more" hidden>Ältere laden</button>
+    <p class="muted small">Einträge älter als 180 Tage werden beim Start automatisch gelöscht.</p>
+  </section>
+</main>
+
+<script src="/static/admin.js"></script>
+</body>
+</html>

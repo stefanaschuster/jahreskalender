@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jahreskalender</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="topbar">
+  <h1 id="title">Kalender</h1>
+  <nav class="viewnav" id="weeknav" hidden>
+    <button class="btn" id="btn-year" title="Zurück zur Jahresansicht (Esc)">← Jahr</button>
+    <button class="btn icon" id="btn-prev" title="Vorherige Woche (←)">‹</button>
+    <span id="week-label"></span>
+    <button class="btn icon" id="btn-next" title="Nächste Woche (→)">›</button>
+  </nav>
+  <div class="legend">
+    <span class="chip none">offen</span>
+    <span class="chip geplant">geplant</span>
+    <span class="chip gebucht">gebucht</span>
+    <label class="toggle"><input type="checkbox" id="only-mine"> nur meine</label>
+    <details class="pf" id="pf">
+      <summary class="btn" id="pf-btn">Teilnehmer ▾</summary>
+      <div class="pf-panel" id="pf-panel"></div>
+    </details>
+  </div>
+  <div class="userbox">
+    <span id="admin-hint">Neues Event: Tage ziehen oder in der Woche Tag klicken</span>
+    <a class="btn" href="/?ansicht=mobil" title="Smartphone-Ansicht">Handy</a>
+    <a class="btn" id="admin-link" href="/admin" hidden>Admin</a>
+    <span id="username"></span>
+    <button class="btn" id="btn-logout">Abmelden</button>
+  </div>
+</header>
+
+<div class="pf-bar" id="pf-bar" hidden></div>
+
+<main>
+  <section id="year-view" class="year" aria-label="Jahresansicht"></section>
+  <section id="week-view" class="week" aria-label="Wochenansicht" hidden></section>
+</main>
+
+<dialog id="event-dialog">
+  <form method="dialog" class="dlg">
+    <header>
+      <h2 id="ev-title"></h2>
+      <button class="btn icon" value="close" aria-label="Schließen">✕</button>
+    </header>
+    <p id="ev-dates" class="muted"></p>
+    <p id="ev-creator" class="muted small"></p>
+    <p id="ev-note" class="note"></p>
+    <div class="status-buttons" role="group" aria-label="Mein Status">
+      <button type="button" class="btn" data-status="">offen</button>
+      <button type="button" class="btn geplant" data-status="geplant">geplant</button>
+      <button type="button" class="btn gebucht" data-status="gebucht">gebucht</button>
+    </div>
+    <h3>Teilnehmer</h3>
+    <ul id="ev-participants" class="participants"></ul>
+    <footer id="ev-admin" hidden>
+      <button type="button" class="btn" id="ev-edit">Bearbeiten</button>
+      <button type="button" class="btn danger" id="ev-delete">Löschen</button>
+    </footer>
+  </form>
+</dialog>
+
+<dialog id="edit-dialog">
+  <form class="dlg" id="edit-form">
+    <header>
+      <h2 id="edit-heading">Neues Event</h2>
+      <button type="button" class="btn icon" id="edit-close" aria-label="Schließen">✕</button>
+    </header>
+    <label>Titel <input name="title" maxlength="120" required></label>
+    <div class="row">
+      <label>Von <input name="start_date" type="date" required></label>
+      <label>Bis <input name="end_date" type="date" required></label>
+    </div>
+    <label>Notiz <textarea name="note" rows="3" maxlength="2000"></textarea></label>
+    <p class="error" id="edit-error" hidden></p>
+    <footer>
+      <button type="submit" class="btn primary">Speichern</button>
+    </footer>
+  </form>
+</dialog>
+
+<div id="tip" class="tip" role="tooltip" hidden></div>
+
+<script src="/static/common.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

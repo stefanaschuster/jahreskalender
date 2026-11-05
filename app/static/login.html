@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Anmelden · Jahreskalender</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="login-body">
+<main class="login-card">
+  <h1>Jahreskalender</h1>
+  <form id="login-form" autocomplete="on">
+    <label>Benutzername
+      <input name="username" autocomplete="username" required autofocus>
+    </label>
+    <label>Passwort
+      <input name="password" type="password" autocomplete="current-password" required>
+    </label>
+    <p class="error" id="login-error" hidden></p>
+    <button type="submit" class="btn primary">Anmelden</button>
+  </form>
+</main>
+<script src="/static/login.js"></script>
+</body>
+</html>

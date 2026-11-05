@@ -1,0 +1,6 @@
+# In /etc/caddy/Caddyfile ergänzen, Domain anpassen, dann: systemctl reload caddy
+kalender.example.de {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:8005
+	header Strict-Transport-Security "max-age=31536000"
+}

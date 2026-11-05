@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f6f5f2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#161614" media="(prefers-color-scheme: dark)">
+<title>Kalender</title>
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/mobile.css">
+</head>
+<body class="m">
+<header class="m-top">
+  <button class="m-icon" id="m-back" aria-label="Zur Jahresübersicht" hidden>‹</button>
+  <h1 id="m-title">Kalender</h1>
+  <button class="m-pill" id="m-pf-btn">Teilnehmer</button>
+  <button class="m-icon" id="m-menu-btn" aria-label="Menü">☰</button>
+</header>
+
+<div class="pf-bar" id="m-pf-bar" hidden></div>
+
+<main class="m-main">
+  <!-- Jahresübersicht -->
+  <section id="m-year">
+    <div class="m-legend">
+      <span class="chip none">offen</span>
+      <span class="chip geplant">geplant</span>
+      <span class="chip gebucht">gebucht</span>
+    </div>
+    <div class="m-months" id="m-months"></div>
+  </section>
+
+  <!-- Monat -->
+  <section id="m-month" hidden>
+    <nav class="m-monthnav">
+      <button class="m-icon" id="m-prev" aria-label="Vorheriger Monat">‹</button>
+      <h2 id="m-month-title"></h2>
+      <button class="m-icon" id="m-next" aria-label="Nächster Monat">›</button>
+    </nav>
+    <div class="m-grid" id="m-grid"></div>
+    <h3 class="m-listhead" id="m-listhead"></h3>
+    <div class="m-list" id="m-list"></div>
+  </section>
+</main>
+
+<button class="m-fab" id="m-add" aria-label="Neues Event">+</button>
+
+<!-- Menü -->
+<dialog class="sheet" id="m-menu">
+  <div class="sheet-body">
+    <p class="muted" id="m-user"></p>
+    <label class="m-row"><span>Nur meine Events</span><input type="checkbox" id="m-only-mine"></label>
+    <a class="m-row" id="m-admin" href="/admin" hidden>Admin-Seite</a>
+    <a class="m-row" href="/?ansicht=desktop">Desktop-Ansicht</a>
+    <button class="m-row" id="m-logout">Abmelden</button>
+    <button class="btn m-close" data-close>Schließen</button>
+  </div>
+</dialog>
+
+<!-- Teilnehmer-Filter -->
+<dialog class="sheet" id="m-pf">
+  <div class="sheet-body">
+    <h2>Teilnehmer filtern</h2>
+    <div id="m-pf-panel" class="m-pf-panel"></div>
+    <button class="btn primary m-close" data-close>Fertig</button>
+  </div>
+</dialog>
+
+<!-- Event-Details -->
+<dialog class="sheet" id="m-detail">
+  <div class="sheet-body">
+    <h2 id="d-title"></h2>
+    <p class="muted" id="d-dates"></p>
+    <p class="note" id="d-note"></p>
+    <div class="m-status" id="d-status"></div>
+    <div id="d-people"></div>
+    <p class="muted small" id="d-creator"></p>
+    <div class="m-actions" id="d-actions" hidden>
+      <button class="btn" id="d-edit">Bearbeiten</button>
+      <button class="btn danger" id="d-delete">Löschen</button>
+    </div>
+    <button class="btn m-close" data-close>Schließen</button>
+  </div>
+</dialog>
+
+<!-- Anlegen / Bearbeiten -->
+<dialog class="sheet" id="m-edit">
+  <form class="sheet-body" id="e-form">
+    <h2 id="e-heading">Neues Event</h2>
+    <label>Titel <input name="title" maxlength="120" required></label>
+    <div class="m-two">
+      <label>Von <input name="start_date" type="date" required></label>
+      <label>Bis <input name="end_date" type="date" required></label>
+    </div>
+    <label>Notiz <textarea name="note" rows="3" maxlength="2000"></textarea></label>
+    <p class="error" id="e-error" hidden></p>
+    <button type="submit" class="btn primary">Speichern</button>
+    <button type="button" class="btn m-close" data-close>Abbrechen</button>
+  </form>
+</dialog>
+
+<script src="/static/common.js"></script>
+<script src="/static/mobile.js"></script>
+</body>
+</html>
