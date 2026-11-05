@@ -1,10 +1,11 @@
-"""Jahreskalender – FastAPI-Anwendung."""
+"""Jahreskalender – FastAPI-Anwendung (nativeai: uvicorn startet app:app in code/)."""
 import datetime as dt
 import os
 import re
 import secrets
 import time
 from collections import defaultdict
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Literal, Optional
 
@@ -13,7 +14,7 @@ from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 
-from . import db
+import db
 
 YEAR = int(os.environ.get("KAL_YEAR", "2027"))
 SESSION_DAYS = 30
@@ -21,15 +22,34 @@ COOKIE = "kal_session"
 STATIC = Path(__file__).resolve().parent / "static"
 ACTIVITY_DAYS = 180                      # Protokolleinträge älter als das werden gelöscht
 
-app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
-app.mount("/static", StaticFiles(directory=STATIC), name="static")
+NAME_RE = re.compile(r"^[A-Za-z0-9._-]{2,64}$")
+MIN_PW = 10
 
 
-@app.on_event("startup")
-def _startup() -> None:
+def _bootstrap_admin(con) -> None:
+    """Erster Admin aus .env (ADMIN_USER, ADMIN_PASSWORD), nur solange es noch keine Benutzer gibt."""
+    name = os.environ.get("ADMIN_USER", "").strip()
+    pw = os.environ.get("ADMIN_PASSWORD", "")
+    if not name or con.execute("SELECT 1 FROM users LIMIT 1").fetchone():
+        return
+    if not NAME_RE.match(name) or len(pw) < MIN_PW:
+        print("ADMIN_USER/ADMIN_PASSWORD ungültig (Name 2–64 Zeichen A–Z a–z 0–9 . _ -, Passwort ≥ 10 Zeichen)")
+        return
+    con.execute("INSERT INTO users (username, pw_hash, is_admin) VALUES (?, ?, 1)", (name, db.hash_password(pw)))
+    print(f"Erster Admin angelegt: {name}")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     db.init_db()
     with db.connect() as con:
         con.execute("DELETE FROM activity WHERE ts < datetime('now', ?)", (f"-{ACTIVITY_DAYS} days",))
+        _bootstrap_admin(con)
+    yield
+
+
+app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
+app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 
 # ---------- Auth ----------
@@ -68,7 +88,7 @@ def admin_user(user: User = Depends(current_user)) -> User:
 
 
 def _ip(request: Request) -> str:
-    # uvicorn setzt client.host hinter Caddy aus X-Forwarded-For (proxy_headers in run.py)
+    # uvicorn setzt client.host hinter dem Proxy aus X-Forwarded-For (--proxy-headers)
     return request.client.host if request.client else ""
 
 
@@ -139,6 +159,27 @@ def logout(request: Request, response: Response):
 @app.get("/api/me")
 def me(user: User = Depends(current_user)):
     return {**user.model_dump(), "year": YEAR}
+
+
+class OwnPasswordIn(BaseModel):
+    old_password: str = Field(max_length=256)
+    new_password: str = Field(max_length=256)
+
+
+@app.post("/api/password", dependencies=[Depends(_require_json)])
+def change_password(data: OwnPasswordIn, request: Request, user: User = Depends(current_user)):
+    """Eigenes Passwort ändern. Andere Sitzungen werden beendet, die aktuelle bleibt."""
+    if len(data.new_password) < MIN_PW:
+        raise HTTPException(400, f"Neues Passwort muss mindestens {MIN_PW} Zeichen haben")
+    with db.connect() as con:
+        row = con.execute("SELECT pw_hash FROM users WHERE id = ?", (user.id,)).fetchone()
+        if not db.verify_password(data.old_password, row["pw_hash"]):
+            log(request, user, "passwort_fehlgeschlagen")
+            raise HTTPException(400, "Bisheriges Passwort ist falsch")
+        con.execute("UPDATE users SET pw_hash = ? WHERE id = ?", (db.hash_password(data.new_password), user.id))
+        con.execute("DELETE FROM sessions WHERE user_id = ? AND token != ?", (user.id, request.cookies.get(COOKIE)))
+    log(request, user, "passwort_geaendert")
+    return {"ok": True}
 
 
 @app.get("/api/users")
@@ -325,6 +366,91 @@ def admin_users(_: User = Depends(admin_user)):
                    (SELECT COUNT(*) FROM events e WHERE e.created_by = u.id) AS events
             FROM users u ORDER BY u.username""").fetchall()
         return [dict(r) for r in rows]
+
+
+# ---------- Benutzerverwaltung (Admin) ----------
+
+class NewUserIn(BaseModel):
+    username: str = Field(max_length=64)
+    password: str = Field(max_length=256)
+    is_admin: bool = False
+
+
+class PasswordIn(BaseModel):
+    password: str = Field(max_length=256)
+
+
+class AdminFlagIn(BaseModel):
+    is_admin: bool
+
+
+def _check_pw(pw: str) -> None:
+    if len(pw) < MIN_PW:
+        raise HTTPException(400, f"Passwort muss mindestens {MIN_PW} Zeichen haben")
+
+
+def _get_user(con, user_id: int):
+    row = con.execute("SELECT id, username, is_admin FROM users WHERE id = ?", (user_id,)).fetchone()
+    if not row:
+        raise HTTPException(404, "Benutzer nicht gefunden")
+    return row
+
+
+@app.post("/api/admin/users", dependencies=[Depends(_require_json)])
+def admin_add_user(data: NewUserIn, request: Request, admin: User = Depends(admin_user)):
+    name = data.username.strip()
+    if not NAME_RE.match(name):
+        raise HTTPException(400, "Name: 2–64 Zeichen, erlaubt sind A–Z, a–z, 0–9, Punkt, Unterstrich, Bindestrich")
+    _check_pw(data.password)
+    with db.connect() as con:
+        if con.execute("SELECT 1 FROM users WHERE username = ?", (name,)).fetchone():
+            raise HTTPException(409, f"Benutzer „{name}“ existiert bereits")
+        con.execute("INSERT INTO users (username, pw_hash, is_admin) VALUES (?, ?, ?)",
+                    (name, db.hash_password(data.password), int(data.is_admin)))
+    log(request, admin, "benutzer_angelegt", f"{name}{' (Admin)' if data.is_admin else ''}")
+    return {"ok": True}
+
+
+@app.put("/api/admin/users/{user_id}/password", dependencies=[Depends(_require_json)])
+def admin_set_password(user_id: int, data: PasswordIn, request: Request, admin: User = Depends(admin_user)):
+    _check_pw(data.password)
+    with db.connect() as con:
+        u = _get_user(con, user_id)
+        con.execute("UPDATE users SET pw_hash = ? WHERE id = ?", (db.hash_password(data.password), user_id))
+        con.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+    log(request, admin, "benutzer_passwort", u["username"])
+    return {"ok": True}
+
+
+@app.put("/api/admin/users/{user_id}/admin", dependencies=[Depends(_require_json)])
+def admin_set_flag(user_id: int, data: AdminFlagIn, request: Request, admin: User = Depends(admin_user)):
+    if user_id == admin.id and not data.is_admin:
+        raise HTTPException(400, "Das eigene Admin-Recht kann man nicht entziehen")
+    with db.connect() as con:
+        u = _get_user(con, user_id)
+        con.execute("UPDATE users SET is_admin = ? WHERE id = ?", (int(data.is_admin), user_id))
+    log(request, admin, "benutzer_rolle", f"{u['username']} → {'Admin' if data.is_admin else 'Benutzer'}")
+    return {"ok": True}
+
+
+@app.post("/api/admin/users/{user_id}/logout", dependencies=[Depends(_require_json)])
+def admin_logout_user(user_id: int, request: Request, admin: User = Depends(admin_user)):
+    with db.connect() as con:
+        u = _get_user(con, user_id)
+        n = con.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,)).rowcount
+    log(request, admin, "benutzer_abgemeldet", f"{u['username']} ({n} Sitzung(en))")
+    return {"ok": True, "sessions": n}
+
+
+@app.delete("/api/admin/users/{user_id}", dependencies=[Depends(_require_json)])
+def admin_delete_user(user_id: int, request: Request, admin: User = Depends(admin_user)):
+    if user_id == admin.id:
+        raise HTTPException(400, "Den eigenen Benutzer kann man nicht löschen")
+    with db.connect() as con:
+        u = _get_user(con, user_id)
+        con.execute("DELETE FROM users WHERE id = ?", (user_id,))
+    log(request, admin, "benutzer_geloescht", u["username"])
+    return {"ok": True}
 
 
 # ---------- Seiten ----------

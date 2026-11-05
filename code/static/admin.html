@@ -18,20 +18,23 @@
 
 <main class="admin">
   <section>
-    <h2>Benutzer</h2>
+    <div class="section-head">
+      <h2>Benutzer</h2>
+      <button class="btn primary" id="btn-add-user">+ Benutzer</button>
+    </div>
     <div class="table-wrap">
       <table class="data" id="users">
         <thead>
           <tr>
             <th>Name</th><th>Rolle</th><th class="num">Logins</th><th>Letzter Login</th><th>Zuletzt aktiv</th>
             <th class="num">Sitzungen</th><th class="num">Geplant</th><th class="num">Gebucht</th>
-            <th class="num">Events angelegt</th><th class="num">Aktionen</th>
+            <th class="num">Events angelegt</th><th class="num">Aktionen</th><th>Verwalten</th>
           </tr>
         </thead>
         <tbody></tbody>
       </table>
     </div>
-    <p class="muted small">Klick auf einen Benutzer filtert das Protokoll. Benutzer verwalten: <code>python3 user.py</code></p>
+    <p class="muted small">Klick auf einen Benutzer filtert das Protokoll.</p>
   </section>
 
   <section>
@@ -55,6 +58,23 @@
     <p class="muted small">Einträge älter als 180 Tage werden beim Start automatisch gelöscht.</p>
   </section>
 </main>
+
+<dialog id="user-dialog">
+  <form class="dlg" id="user-form">
+    <header>
+      <h2 id="user-heading">Neuer Benutzer</h2>
+      <button type="button" class="btn icon" id="user-close" aria-label="Schließen">✕</button>
+    </header>
+    <label id="user-name-label">Name <input name="username" maxlength="64" pattern="[A-Za-z0-9._\-]{2,64}" autocomplete="off" required></label>
+    <label>Passwort (mindestens 10 Zeichen) <input name="password" type="text" minlength="10" maxlength="256" autocomplete="new-password" required></label>
+    <label class="toggle" id="user-admin-label"><input type="checkbox" name="is_admin"> Admin</label>
+    <p class="error" id="user-error" hidden></p>
+    <footer>
+      <button type="button" class="btn" id="user-gen">Passwort erzeugen</button>
+      <button type="submit" class="btn primary">Speichern</button>
+    </footer>
+  </form>
+</dialog>
 
 <script src="/static/admin.js"></script>
 </body>

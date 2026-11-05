@@ -393,3 +393,14 @@ code { font-size: 12px; background: var(--we); padding: 1px 5px; border-radius: 
 }
 .pf-chip::after { content: " ×"; color: var(--muted); }
 .pf-chip:hover { border-color: var(--danger); }
+
+/* Benutzerverwaltung */
+table.data td.manage .btn + .btn { margin-left: 4px; }
+.btn.small { padding: 2px 8px; font-size: 12px; }
+.dlg label.toggle { flex-direction: row; align-items: center; gap: 6px; color: var(--text); }
+.dlg label[hidden] { display: none; }
+
+/* Passwort ändern */
+.pw-fields { display: flex; flex-direction: column; gap: 10px; }
+.pw-fields[hidden], .ok[hidden], [type=submit][hidden] { display: none; }
+.ok { color: var(--gebucht); margin: 0; font-size: 13px; }

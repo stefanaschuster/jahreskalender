@@ -77,6 +77,40 @@ async function api(method, url, body) {
   return data;
 }
 
+/* ---------- Eigenes Passwort ändern (Desktop + Handy) ---------- */
+function setupPasswordDialog(dialog, openBtn) {
+  const form = dialog.querySelector("form");
+  const err = form.querySelector(".error");
+  openBtn.addEventListener("click", () => {
+    form.reset();
+    err.hidden = true;
+    form.querySelector("[data-ok]").hidden = true;
+    form.querySelector("[data-fields]").hidden = false;
+    form.querySelector("[type=submit]").hidden = false;
+    dialog.showModal();
+    form.old_password.focus();
+  });
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    err.hidden = true;
+    if (form.new_password.value !== form.new_password2.value) {
+      err.textContent = "Die neuen Passwörter stimmen nicht überein";
+      err.hidden = false;
+      return;
+    }
+    try {
+      await api("POST", "/api/password", { old_password: form.old_password.value, new_password: form.new_password.value });
+      form.reset();
+      form.querySelector("[data-fields]").hidden = true;
+      form.querySelector("[type=submit]").hidden = true;
+      form.querySelector("[data-ok]").hidden = false;
+    } catch (ex) {
+      err.textContent = ex.message;
+      err.hidden = false;
+    }
+  });
+}
+
 /* ---------- Teilnehmer-Filter (Desktop + Handy) ----------
    Mehrfachauswahl von Personen; "geplant" und "gebucht" zählen gleich als "dabei".
    Modus "alle":  Event wird gezeigt, wenn ALLE gewählten Personen dabei sind.

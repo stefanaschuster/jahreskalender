@@ -30,6 +30,7 @@
     <a class="btn" href="/?ansicht=mobil" title="Smartphone-Ansicht">Handy</a>
     <a class="btn" id="admin-link" href="/admin" hidden>Admin</a>
     <span id="username"></span>
+    <button class="btn" id="btn-password">Passwort</button>
     <button class="btn" id="btn-logout">Abmelden</button>
   </div>
 </header>
@@ -77,6 +78,25 @@
     </div>
     <label>Notiz <textarea name="note" rows="3" maxlength="2000"></textarea></label>
     <p class="error" id="edit-error" hidden></p>
+    <footer>
+      <button type="submit" class="btn primary">Speichern</button>
+    </footer>
+  </form>
+</dialog>
+
+<dialog id="pw-dialog">
+  <form class="dlg">
+    <header>
+      <h2>Passwort ändern</h2>
+      <button type="button" class="btn icon" data-close aria-label="Schließen">✕</button>
+    </header>
+    <div class="pw-fields" data-fields>
+      <label>Bisheriges Passwort <input name="old_password" type="password" autocomplete="current-password" required></label>
+      <label>Neues Passwort (mindestens 10 Zeichen) <input name="new_password" type="password" minlength="10" maxlength="256" autocomplete="new-password" required></label>
+      <label>Neues Passwort wiederholen <input name="new_password2" type="password" minlength="10" maxlength="256" autocomplete="new-password" required></label>
+    </div>
+    <p class="ok" data-ok hidden>Passwort geändert. Andere angemeldete Geräte wurden abgemeldet.</p>
+    <p class="error" hidden></p>
     <footer>
       <button type="submit" class="btn primary">Speichern</button>
     </footer>

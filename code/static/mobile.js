@@ -330,6 +330,9 @@ $("m-only-mine").addEventListener("change", (e) => {
   try { localStorage.setItem("kal-only-mine", state.onlyMine ? "1" : "0"); } catch {}
   render();
 });
+setupPasswordDialog($("m-pw"), $("m-password"));
+$("m-password").addEventListener("click", () => $("m-menu").close(), true);
+
 $("m-logout").addEventListener("click", async () => {
   try { await api("POST", "/api/logout"); } finally { location.href = "/login"; }
 });

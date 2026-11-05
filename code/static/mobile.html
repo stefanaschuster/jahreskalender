@@ -51,6 +51,7 @@
     <p class="muted" id="m-user"></p>
     <label class="m-row"><span>Nur meine Events</span><input type="checkbox" id="m-only-mine"></label>
     <a class="m-row" id="m-admin" href="/admin" hidden>Admin-Seite</a>
+    <button class="m-row" id="m-password">Passwort ändern</button>
     <a class="m-row" href="/?ansicht=desktop">Desktop-Ansicht</a>
     <button class="m-row" id="m-logout">Abmelden</button>
     <button class="btn m-close" data-close>Schließen</button>
@@ -96,6 +97,22 @@
     <p class="error" id="e-error" hidden></p>
     <button type="submit" class="btn primary">Speichern</button>
     <button type="button" class="btn m-close" data-close>Abbrechen</button>
+  </form>
+</dialog>
+
+<!-- Passwort ändern -->
+<dialog class="sheet" id="m-pw">
+  <form class="sheet-body">
+    <h2>Passwort ändern</h2>
+    <div class="pw-fields" data-fields>
+      <label>Bisheriges Passwort <input name="old_password" type="password" autocomplete="current-password" required></label>
+      <label>Neues Passwort (mindestens 10 Zeichen) <input name="new_password" type="password" minlength="10" maxlength="256" autocomplete="new-password" required></label>
+      <label>Neues Passwort wiederholen <input name="new_password2" type="password" minlength="10" maxlength="256" autocomplete="new-password" required></label>
+    </div>
+    <p class="ok" data-ok hidden>Passwort geändert. Andere angemeldete Geräte wurden abgemeldet.</p>
+    <p class="error" hidden></p>
+    <button type="submit" class="btn primary">Speichern</button>
+    <button type="button" class="btn m-close" data-close>Schließen</button>
   </form>
 </dialog>
 
