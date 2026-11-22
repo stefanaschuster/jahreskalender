@@ -35,8 +35,15 @@ body.m button { touch-action: manipulation; }
 .m-main { display: block; padding: 12px 12px 0; }
 .m-main section[hidden] { display: none; }
 
+/* ---------- Legende / Kategorie-Filter ---------- */
+.m-legend { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.m-legend .cats { gap: 6px; }
+.m-legend .cat { font-size: 13px; padding: 5px 12px 5px 9px; border-radius: 16px; }
+.m-legend .cat i { width: 12px; height: 12px; }
+.m-legend .status-legend { font-size: 12px; }
+.m-legend .ev-sample { font-size: 12px; padding: 1px 8px; }
+
 /* ---------- Jahr ---------- */
-.m-legend { display: flex; gap: 6px; margin-bottom: 12px; }
 .m-months { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
 @media (min-width: 560px) { .m-months { grid-template-columns: repeat(3, 1fr); } }
 .m-mini {
@@ -73,7 +80,8 @@ body.m button { touch-action: manipulation; }
 .md.we { color: var(--text); opacity: .55; }
 .md.hol { color: var(--hol-text); font-weight: 700; opacity: 1; }
 .md.today { outline: 1.5px solid var(--today); }
-.md.s-offen { background: var(--offen-bg); color: var(--offen); font-weight: 600; opacity: 1; }
+/* Tagesfarbe = eigener Status des wichtigsten Events */
+.md.s-offen { background: var(--offen-bg); box-shadow: inset 0 0 0 1.5px var(--offen); color: var(--text); font-weight: 600; opacity: 1; }
 .md.s-geplant { background: var(--geplant); color: #3a2a00; font-weight: 600; opacity: 1; }
 .md.s-gebucht { background: var(--gebucht); color: #fff; font-weight: 600; opacity: 1; }
 
@@ -108,9 +116,9 @@ body.m button { touch-action: manipulation; }
 .m-day.sel { box-shadow: inset 0 0 0 2px var(--text); }
 .m-num { font-size: 14px; width: 24px; height: 24px; line-height: 24px; text-align: center; }
 .m-bars { display: flex; flex-direction: column; gap: 2px; width: 100%; padding: 0 3px; align-items: stretch; }
-.m-bars i { height: 4px; border-radius: 2px; }
+.m-bars i { height: 5px; border-radius: 3px; }
 .m-bars b { font-size: 9px; font-weight: 600; color: var(--muted); line-height: 1; text-align: center; }
-.m-bars .s-offen { background: var(--offen); }
+.m-bars .s-offen { background: var(--offen-bg); box-shadow: inset 0 0 0 1.5px var(--offen); }
 .m-bars .s-geplant { background: var(--geplant); }
 .m-bars .s-gebucht { background: var(--gebucht); }
 
@@ -118,20 +126,20 @@ body.m button { touch-action: manipulation; }
 .m-list { display: flex; flex-direction: column; gap: 10px; }
 .m-empty { padding: 4px 2px; }
 
-/* Karten */
+/* Karten: linker Rand = Kategorie, Hintergrund = eigener Status */
 .m-card {
   background: var(--surface);
   border: 1px solid var(--line);
-  border-left: 5px solid var(--offen);
+  border-left: 6px solid var(--c);
   border-radius: 12px;
   padding: 10px 12px 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
-.m-card.s-offen { background: var(--offen-bg); border-color: var(--offen); }
-.m-card.s-geplant { border-left-color: var(--geplant); }
-.m-card.s-gebucht { border-left-color: var(--gebucht); }
+.m-card.s-offen { background: var(--offen-bg); border-color: var(--offen); border-left-color: var(--c); }
+.m-card.s-geplant { background: var(--geplant-bg); border-color: var(--geplant); border-left-color: var(--c); }
+.m-card.s-gebucht { background: var(--gebucht-bg); border-color: var(--gebucht); border-left-color: var(--c); }
 .m-card-head {
   border: none;
   background: none;
@@ -142,9 +150,11 @@ body.m button { touch-action: manipulation; }
   gap: 2px;
   cursor: pointer;
 }
+.m-card-cat { font-size: 11px; font-weight: 700; color: var(--c); text-transform: uppercase; letter-spacing: .03em; }
 .m-card-head strong { font-size: 16px; }
 .m-card-head .muted { font-size: 13px; }
 .m-people { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.m-people:empty { display: none; }
 .m-people-row { display: flex; gap: 6px; align-items: baseline; }
 .m-people-row .chip { flex: none; }
 
@@ -182,6 +192,7 @@ body.m button { touch-action: manipulation; }
   cursor: pointer;
   z-index: 6;
 }
+.m-fab[hidden] { display: none; }
 
 /* ---------- Bottom-Sheets ---------- */
 dialog.sheet {
@@ -204,7 +215,7 @@ dialog.sheet[open] { animation: sheet-in .18s ease-out; }
 .sheet-body h2 { margin: 0; font-size: 19px; }
 .sheet-body p { margin: 0; }
 .sheet-body label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); flex: 1; }
-.sheet-body input, .sheet-body textarea { font-size: 16px; }   /* 16px verhindert Zoom auf iOS */
+.sheet-body input, .sheet-body textarea, .sheet-body select { font-size: 16px; }   /* 16px verhindert Zoom auf iOS */
 .sheet-body .btn { padding: 11px; font-size: 15px; }
 .m-two { display: flex; gap: 10px; }
 .m-two input { width: 100%; min-width: 0; }
@@ -231,6 +242,19 @@ dialog.sheet[open] { animation: sheet-in .18s ease-out; }
 .sheet-body .m-row[hidden] { display: none; }
 .sheet-body .m-row input { width: 22px; height: 22px; }
 #d-people:empty { display: none; }
+#d-creator:empty { display: none; }
+.sheet-body .m-legal { padding: 12px 4px 0; color: var(--muted); }
+.m-legal a { color: var(--muted); }
+
+/* Gruppen-Sheet */
+.m-gp { max-height: none; overflow: visible; }
+.m-gp .gp-form .btn { padding: 9px 14px; }
+.m-gp .gp-invite .btn { padding: 9px 12px; font-size: 14px; }
+.m-gp .gp-actions .btn.small { padding: 8px 12px; font-size: 14px; }
+.m-gp .gp-member { font-size: 14px; padding: 4px 10px; }
+.m-gp .gp-x { font-size: 18px; padding-left: 8px; }
+.m-gp .gp-star { font-size: 18px; padding-left: 8px; }
+dialog.sheet#m-groups { overflow: auto; }
 
 /* ---------- Teilnehmer-Filter (Handy) ---------- */
 .m-pill {
@@ -250,3 +274,33 @@ body.m .pf-chip { padding: 5px 10px; font-size: 14px; }
 .m-pf-panel .pf-list { max-height: 45vh; overflow: auto; }
 .sheet-body .m-pf-panel .pf-item { flex-direction: row; font-size: 16px; color: var(--text); padding: 11px 4px; border-bottom: 1px solid var(--line); gap: 12px; }
 .m-pf-panel .pf-item input { width: 22px; height: 22px; }
+
+/* Veranstalter & Rennstrecke (Handy) */
+body.m .refs { font-size: 14px; gap: 6px 16px; }
+body.m .ref-link { padding: 4px 0; }
+dialog.sheet.ref-dlg .ref-details { font-size: 16px; }
+dialog.sheet.feed-dlg { overflow: auto; }
+body.m .feed-row { flex-direction: column; align-items: stretch; }
+body.m .feed-acts .btn { flex: 1; text-align: center; padding: 10px; font-size: 15px; }
+
+/* Filter Veranstalter / Rennstrecke (Handy) */
+body.m .rf { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+body.m .rf-select { max-width: none; width: 100%; min-width: 0; font-size: 15px; padding: 8px 10px; border-radius: 10px; }
+
+/* Gruppen-Teilnahme (Handy) */
+.sheet-body label.gpart-item { flex: none; flex-direction: row; font-size: 15px; color: var(--text); padding: 8px 12px; }
+.sheet-body .gpart-item input { width: 20px; height: 20px; }
+body.m .rf { grid-template-columns: 1fr 1fr; }
+body.m .rf-select:nth-child(3) { grid-column: 1 / -1; }
+
+/* Erklär-Video */
+.m-intro { margin: 0 0 12px; align-items: flex-start; gap: 12px; }
+.m-intro .intro-thumb { width: 74px; aspect-ratio: 9 / 16; }
+.m-intro .intro-text { gap: 4px; }
+.m-intro .intro-text .btn { align-self: flex-start; margin-top: 6px; }
+.m-video { width: min(100vw - 24px, (100vh - 40px) * 9 / 16); max-height: calc(100vh - 40px); }
+.m-video .video-wrap video { max-height: calc(100vh - 40px); }
+.m-row[hidden] { display: none; }
+.guest-bar { margin-bottom: 12px; }
+body.m .guest-acts .btn { padding: 9px 14px; font-size: 15px; }
+.m-status[hidden] { display: none; }

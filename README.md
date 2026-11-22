@@ -1,16 +1,23 @@
-# Jahreskalender 2027
+# racingkalender.de
 
-Eine Codebasis, zwei Betriebsarten: auf **nativeai** (Unix-Socket, gestartet von der Umgebung) oder **selbst gehostet** mit `run.py` auf Port 8005.
+Jahreskalender für Trackdays und Rennen: öffentliche Termine der Veranstalter, Gruppen-Termine und private Termine,
+je Termin der eigene Status (offen / geplant / gebucht). Desktop-Version und eigene Handy-Oberfläche.
+
+Eine Codebasis, zwei Betriebsarten: auf **instant-run** (Unix-Socket, gestartet von der Umgebung) oder **selbst gehostet** mit `run.py` auf Port 8005.
 
 ```
-code/app.py            FastAPI-Anwendung (Objekt `app`)
-code/db.py             SQLite und Passwort-Hashing
-code/requirements.txt  gepinnte Abhängigkeiten
-code/static/           Frontend (Vanilla HTML/CSS/JS, kein Build)
-run.py                 Start selbst gehostet (Port 8005)
-user.py                Benutzerverwaltung auf der Kommandozeile
-deploy/                systemd-Unit und Caddy-Snippet für selbst gehostet
-.env.example           Konfiguration
+code/app.py                        FastAPI-Anwendung (Objekt `app`)
+code/db.py                         SQLite-Schema und Passwort-Hashing
+code/ics.py                        iCalendar lesen/schreiben (Import, Export, Kalender-Abo)
+code/mail.py                       Mailversand über die Brevo-API
+code/loesche_events_stammdaten.py  Skript: alle Events, Veranstalter und Strecken löschen
+code/VERSION                       Version (Fußzeile)
+code/requirements.txt              gepinnte Abhängigkeiten
+code/static/                       Frontend (Vanilla HTML/CSS/JS, kein Build)
+run.py                             Start selbst gehostet (Port 8005)
+user.py                            Benutzerverwaltung auf der Kommandozeile
+deploy/                            systemd-Unit und Caddy-Snippet für selbst gehostet
+.env.example                       Konfiguration
 ```
 
 Daten liegen in `$APP_DATA/kalender.db`. Ohne `APP_DATA` (selbst gehostet) ist das `data/kalender.db`.
@@ -20,9 +27,23 @@ Daten liegen in `$APP_DATA/kalender.db`. Ohne `APP_DATA` (selbst gehostet) ist d
 | Variable | Bedeutung |
 |---|---|
 | `KAL_YEAR` | Kalenderjahr (Standard 2027) |
-| `ADMIN_USER`, `ADMIN_PASSWORD` | Erster Admin; wird nur angelegt, solange die Datenbank noch keine Benutzer hat |
+| `ADMIN_USER`, `ADMIN_PASSWORD` | Erster Admin; wird angelegt, falls es diesen Benutzer noch nicht gibt |
+| `PUBLIC_URL` | Basis für Links in Mails und im Kalender-Abo, z. B. `https://racingkalender.de` |
+| `BREVO_API_KEY`, `MAIL_FROM`, `MAIL_FROM_NAME` | Mailversand (Registrierung, Passwort vergessen). Ohne Key sind beide Funktionen ausgeblendet |
+| `ADMIN_EMAIL` | Empfänger der Info bei Neuanmeldung (mehrere mit Komma) |
+| `REGISTRATION_OPEN` | `0` schaltet die Selbst-Registrierung ab |
+| `INSTANTRUN_SITE` | Link „hosted on instant-run“ in der Fußzeile |
 
-## nativeai
+## Rollen
+
+| Rolle | Darf |
+|---|---|
+| **Besucher** (ohne Konto) | öffentliche Termine sehen |
+| **Benutzer** | Status setzen, Gruppen gründen/beitreten, **private Termine** anlegen – nur für ihn selbst sichtbar, auch nicht für Admins |
+| **Eventmanager** | zusätzlich öffentliche Termine *seiner* Veranstalter anlegen, ändern, löschen und deren Angaben (Website, E-Mail, Telefon, Notiz) pflegen. Zuordnung durch den Admin |
+| **Admin** | alles: öffentliche und Gruppen-Termine, Stammdaten, Benutzer, ICS-Import/-Export, Erklär-Videos |
+
+## instant-run
 
 Inhalt von `code/` als `code/` der App hochladen, `.env` setzen, deployen. `run.py`, `user.py` und `deploy/` werden dort nicht gebraucht.
 
@@ -50,26 +71,34 @@ python3 user.py list
 python3 user.py logout anna
 ```
 
+### Alle Events und Stammdaten löschen
+
+```bash
+python code/loesche_events_stammdaten.py          # fragt nach, Bestätigung mit LÖSCHEN
+python code/loesche_events_stammdaten.py --ja     # ohne Rückfrage
+```
+
+Löscht alle Events (inkl. Markierungen und Gruppen-Teilnahmen), Veranstalter, Rennstrecken und Eventmanager-Zuordnungen.
+Benutzer, Gruppen und Protokoll bleiben. Vorher wird `data/kalender-vor-loeschung-<Zeit>.db` als Sicherung angelegt.
+
 ## Bedienung
 
 - **Jahresansicht:** Monate als Zeilen, Spalten nach Wochentag ausgerichtet. Feiertage Baden-Württemberg markiert.
 - **Wochenansicht:** Klick auf einen Tag oder „KW“. ←/→ blättern, Esc zurück.
-- **Event anklicken:** Status offen / geplant / gebucht setzen, Teilnehmer sehen.
-- **Neues Event (alle):** in der Jahresansicht über mehrere Tage ziehen oder in der Wochenansicht einen Tag anklicken. Bearbeiten/Löschen darf der Ersteller oder ein Admin.
-- **Maus über ein Event:** zeigt, wer gebucht bzw. geplant hat.
-- **Teilnehmer-Filter:** Button „Teilnehmer“ → Personen auswählen (geplant und gebucht zählen gleich). „alle zusammen“ zeigt Events, bei denen alle Gewählten dabei sind, „mindestens einer“ Events mit irgendeinem davon. Auswahl wird im Browser gemerkt.
-- **Eigenes Passwort ändern:** Button „Passwort“ (Desktop) bzw. Menü → „Passwort ändern“ (Handy). Andere Geräte werden dabei abgemeldet.
-- Änderungen anderer erscheinen automatisch nach spätestens 10 Sekunden (bzw. sofort beim Zurückwechseln in den Tab).
+- **Event anklicken:** Status setzen, Veranstalter und Rennstrecke als Link mit Detailfenster, Teilnehmer aus den eigenen Gruppen.
+- **Neuer Termin:** in der Jahresansicht über Tage ziehen oder in der Wochenansicht einen Tag anklicken (Handy: „+“).
+- **Kategorien** Öffentlich / je Gruppe / Privat: Legende oben blendet ein und aus. Filter nach Veranstalter, Strecke und Gruppe.
+- **Gruppen:** gründen, per Einladungslink beitreten, Owner verwalten Mitglieder und legen fest, ob die Gruppe an einem Event teilnimmt.
+- **Kalender-Abo:** geheimer ICS-Link für eigene Termine, alle Termine oder je Gruppe.
+- **Meine Veranstalter** (Eventmanager): im Benutzermenü bzw. Handy-Menü.
+- Änderungen anderer erscheinen automatisch nach spätestens 10 Sekunden.
 
 ## Admin-Seite
 
-`/admin` (Link oben rechts, nur für Admins):
-
-- **Benutzerverwaltung:** „+ Benutzer“ legt Benutzer mit Passwort an (optional als Admin, mit Passwort-Generator). Je Benutzer: Passwort setzen, Admin an/aus, Sitzungen beenden, löschen. Den eigenen Benutzer kann man weder löschen noch zum Nicht-Admin machen.
-- **Übersicht:** Logins, zuletzt aktiv, aktive Sitzungen, Markierungen.
-- **Aktivitätsprotokoll:** Login/Logout, fehlgeschlagene Logins, Ansichten, Events, Status, Passwort- und Benutzeränderungen, mit IP und Filter nach Benutzer/Aktion. Aktualisiert sich live. Einträge älter als 180 Tage werden beim Start gelöscht (`ACTIVITY_DAYS` in `code/app.py`).
+`/admin` (nur für Admins): Benutzer (inkl. Rolle Eventmanager), Veranstalter, Rennstrecken, ICS-Import/-Export,
+Erklär-Videos und Aktivitätsprotokoll (live, Einträge älter als 180 Tage werden beim Start gelöscht).
 
 ## Smartphone
 
-Handys bekommen unter `/` automatisch eine eigene Oberfläche (Erkennung per User-Agent, Tablets erhalten die Desktop-Version): Jahresübersicht als 12 Mini-Monate mit farbigen Tagen, Tippen öffnet den Monat mit Terminliste und Status-Umschalter, „+“ legt ein Event an, Wischen wechselt den Monat.
-Umschalten (wird per Cookie gemerkt): `/?ansicht=mobil`, `/?ansicht=desktop`, `/?ansicht=auto`. Links dafür: „Handy“ oben in der Desktop-Version, „Desktop-Ansicht“ im Menü der Handy-Version.
+Handys bekommen unter `/` automatisch eine eigene Oberfläche (Erkennung per User-Agent, Tablets erhalten die Desktop-Version).
+Umschalten (wird per Cookie gemerkt): `/?ansicht=mobil`, `/?ansicht=desktop`, `/?ansicht=auto`.

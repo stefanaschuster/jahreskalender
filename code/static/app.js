@@ -1,14 +1,22 @@
 "use strict";
 
 /* ---------- Zustand ---------- */
-const state = { version: null, me: null, year: 2027, events: [], holidays: new Map(), onlyMine: false, week: null, openEventId: null };
+const state = { version: null, me: null, year: 2027, events: [], groups: [], holidays: new Map(),
+  onlyMine: false, week: null, openEventId: null };
 
 async function loadEvents() {
   const { v } = await api("GET", "/api/version");      // Version vor den Daten holen: verpasst keine Änderung
-  state.events = await api("GET", "/api/events");
+  [state.events, state.groups] = await Promise.all([api("GET", "/api/events"), api("GET", "/api/groups"), loadRefs()]);
   state.version = v;
+  buildRefFilter($("rf"), state.groups, render);
   hideTip();
   render();
+}
+
+// Nach Gruppenänderungen: Daten und Gruppen-Panel neu
+async function reloadAll() {
+  await loadEvents();
+  if ($("groups-dialog").open) buildGroupsPanel($("groups-panel"), state.groups, reloadAll);
 }
 
 /* Live-Aktualisierung: Versionszähler abfragen, nur bei Änderung neu laden */
@@ -20,7 +28,13 @@ async function checkForUpdates() {
   polling = true;
   try {
     const { v } = await api("GET", "/api/version");
-    if (v !== state.version) await loadEvents();
+    if (v !== state.version) {
+      if (!state.me.guest) {                             // Rollen (z. B. Eventmanager) können sich geändert haben
+        state.me = await api("GET", "/api/me");
+        applyRole();
+      }
+      await loadEvents();
+    }
   } catch { /* offline o. Ä.: beim nächsten Durchlauf erneut */ }
   finally { polling = false; }
 }
@@ -29,20 +43,13 @@ setInterval(checkForUpdates, POLL_MS);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) checkForUpdates(); });
 window.addEventListener("focus", checkForUpdates);
 
+function applyRole() {
+  $("admin-link").hidden = !state.me.is_admin;
+  $("admin-hint").hidden = !canCreate(state.me);
+}
+
 function visibleEvents() {
-  return state.events.filter((e) => (!state.onlyMine || e.my_status) && matchesPeople(e));
-}
-
-function renderPeopleFilter() {
-  const n = peopleFilter.names.size;
-  $("pf-btn").textContent = n ? `Teilnehmer (${n}) ▾` : "Teilnehmer ▾";
-  $("pf-btn").classList.toggle("on", n > 0);
-  buildPeopleBar($("pf-bar"), visibleEvents().length, onPeopleChange);
-}
-
-function onPeopleChange() {
-  if ($("pf").open) buildPeoplePanel($("pf-panel"), onPeopleChange);
-  render();
+  return state.events.filter((e) => (!state.onlyMine || e.my_status) && matchesCat(e) && matchesRefs(e));
 }
 
 /* Spuren (Lanes) vergeben, damit sich überlappende Events nicht verdecken */
@@ -61,8 +68,8 @@ function eventButton(ev, cls) {
   const b = el("button", `ev ${ev.my_status || "none"} ${cls || ""}`);
   b.type = "button";
   b.dataset.id = ev.id;
-  b.setAttribute("aria-label", ev.title);
-  return b;
+  b.setAttribute("aria-label", `${ev.title} (${catName(ev)})`);
+  return paint(b, ev);
 }
 
 /* ---------- Jahresansicht ---------- */
@@ -115,8 +122,7 @@ function renderYear() {
         if (hol) { cell.classList.add("hol"); cell.title = hol; }
         if (dIso === todayIso) cell.classList.add("today");
         cell.dataset.date = dIso;
-        const num = el("span", "dnum", String(day));
-        cell.append(num);
+        cell.append(el("span", "dnum", String(day)));
         if (wd(dt) === 0 || day === 1) {
           const kw = el("button", "kw", `KW${isoWeek(dt)}`);
           kw.type = "button";
@@ -144,9 +150,7 @@ function renderYear() {
 
 /* ---------- Wochenansicht ---------- */
 function weekBounds() {
-  const min = mondayOf(mk(state.year, 0, 1));
-  const max = mondayOf(mk(state.year, 11, 31));
-  return [min, max];
+  return [mondayOf(mk(state.year, 0, 1)), mondayOf(mk(state.year, 11, 31))];
 }
 
 function renderWeek() {
@@ -191,10 +195,13 @@ function renderWeek() {
   for (const seg of segs) {
     const ev = seg.ev;
     const b = eventButton(ev, `big ${seg.contL ? "cont-l" : ""} ${seg.contR ? "cont-r" : ""}`);
-    b.append(el("strong", null, ev.title));
+    b.append(el("span", "meta cat-line", catName(ev)), el("strong", null, ev.title));
     const days = daysBetween(parse(ev.start_date), parse(ev.end_date)) + 1;
     b.append(el("span", "meta", days > 1 ? `${fmtShort(parse(ev.start_date))} – ${fmtShort(parse(ev.end_date))} · ${days} Tage` : "1 Tag"));
-    if (ev.participants.length) {
+    if (refText(ev)) b.append(el("span", "meta", refText(ev)));
+    const gIn = groupNamesIn(ev, state.groups);
+    if (gIn.length) b.append(el("span", "meta", `Gruppe: ${gIn.join(", ")}`));
+    if (ev.participants.length && ev.visibility !== "private") {
       b.append(el("span", "meta", ev.participants.map((p) => `${p.username} (${p.status})`).join(", ")));
     }
     if (ev.note) b.append(el("span", "meta note", ev.note));
@@ -207,7 +214,7 @@ function renderWeek() {
 
 /* ---------- Ansicht wechseln ---------- */
 function render() {
-  renderPeopleFilter();
+  buildLegend($("cats"), state.groups, render);
   const inWeek = !!state.week;
   $("year-view").hidden = inWeek;
   $("week-view").hidden = !inWeek;
@@ -233,7 +240,7 @@ function showYear() {
   track("ansicht_jahr");
   history.replaceState(null, "", location.pathname);
   render();
-  if (anchor) {                                            // Monat der Woche ins Bild holen
+  if (anchor) {
     const m = parse(anchor).getUTCFullYear() < state.year ? 0 : parse(anchor).getUTCMonth();
     $("year-view").querySelectorAll(".month-row")[m]?.scrollIntoView({ block: "center" });
   }
@@ -242,8 +249,7 @@ function showYear() {
 /* ---------- Event-Dialog ---------- */
 function openEvent(id) {
   state.openEventId = id;
-  const ev = state.events.find((e) => e.id === id);
-  if (ev) track("event_angesehen", ev.title);
+  track("event_angesehen", id);
   refreshEventDialog();
   const dlg = $("event-dialog");
   if (!dlg.open) dlg.showModal();
@@ -252,24 +258,30 @@ function openEvent(id) {
 function refreshEventDialog() {
   const ev = state.events.find((e) => e.id === state.openEventId);
   if (!ev) { $("event-dialog").close(); return; }
+  paint($("ev-cat"), ev).textContent = catName(ev);
   $("ev-title").textContent = ev.title;
   const days = daysBetween(parse(ev.start_date), parse(ev.end_date)) + 1;
   $("ev-dates").textContent = days > 1
     ? `${fmt(ev.start_date)} – ${fmt(ev.end_date)} (${days} Tage)` : fmt(ev.start_date);
+  refLinks(ev, $("ev-refs"));
+  groupParticipation(ev, state.groups, $("ev-groups"), setGroupParticipation);
   $("ev-note").textContent = ev.note;
   $("ev-note").hidden = !ev.note;
   for (const b of $("event-dialog").querySelectorAll("[data-status]")) {
     b.classList.toggle("active", (ev.my_status || "") === b.dataset.status);
   }
+  const priv = ev.visibility === "private" || isGuest();
+  $("ev-people-head").hidden = priv;
   const ul = $("ev-participants");
   ul.replaceChildren();
-  if (!ev.participants.length) ul.append(el("li", "muted", "noch niemand"));
+  ul.hidden = priv;
+  if (!ev.participants.length) ul.append(el("li", "muted", noPeopleText(ev)));
   for (const p of ev.participants) {
     const li = el("li");
     li.append(el("span", null, p.username), el("span", `chip ${p.status}`, p.status));
     ul.append(li);
   }
-  $("ev-creator").textContent = ev.creator ? `angelegt von ${ev.creator}` : "";
+  $("ev-creator").textContent = ev.creator && !priv ? `angelegt von ${ev.creator}` : "";
   $("ev-admin").hidden = !ev.can_edit;
 }
 
@@ -282,7 +294,16 @@ async function setStatus(status) {
   } catch (err) { alert(err.message); }
 }
 
-/* ---------- Admin: Event anlegen / bearbeiten ---------- */
+async function setGroupParticipation(groupId, participates) {
+  const id = state.openEventId;
+  try {
+    const updated = await api("PUT", `/api/events/${id}/groups/${groupId}`, { participates });
+    state.events = state.events.map((e) => (e.id === id ? updated : e));
+    render();
+  } catch (err) { alert(err.message); render(); }
+}
+
+/* ---------- Event anlegen / bearbeiten ---------- */
 let editId = null;
 
 function openEdit(ev, start, end) {
@@ -293,17 +314,29 @@ function openEdit(ev, start, end) {
   f.start_date.value = ev ? ev.start_date : start;
   f.end_date.value = ev ? ev.end_date : (end || start);
   f.note.value = ev ? ev.note : "";
+  fillVisibility(f.visibility, state.me, state.groups, ev);
+  fillOrganizerSelect(f, state.me, ev?.organizer_id);
+  fillRefSelect(f.track_id, "track", ev?.track_id);
   $("edit-error").hidden = true;
   $("edit-dialog").showModal();
   f.title.focus();
 }
 
+$("edit-form").visibility.addEventListener("change", (e) => {
+  tintSelect(e.target);
+  const f = $("edit-form");
+  fillOrganizerSelect(f, state.me, refValue(f.organizer_id));
+});
 $("edit-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = e.target;
   let start = f.start_date.value, end = f.end_date.value;
   if (end < start) [start, end] = [end, start];
-  const body = { title: f.title.value, start_date: start, end_date: end, note: f.note.value };
+  const body = { title: f.title.value, start_date: start, end_date: end, note: f.note.value,
+    organizer_id: refValue(f.organizer_id), track_id: refValue(f.track_id), ...visibilityBody(f.visibility) };
+  const old = editId && state.events.find((x) => x.id === editId);
+  if (old && old.participants.some((p) => p.username !== state.me.username) && catKey(old) !== f.visibility.value
+      && !confirm("Die Sichtbarkeit ändert sich. Wer das Event danach nicht mehr sieht, verliert seine Markierung. Fortfahren?")) return;
   try {
     if (editId) await api("PUT", `/api/events/${editId}`, body);
     else await api("POST", "/api/events", body);
@@ -339,6 +372,13 @@ for (const b of $("event-dialog").querySelectorAll("[data-status]")) {
   b.addEventListener("click", () => setStatus(b.dataset.status));
 }
 
+/* ---------- Gruppen ---------- */
+$("btn-groups").addEventListener("click", () => {
+  buildGroupsPanel($("groups-panel"), state.groups, reloadAll);
+  $("groups-dialog").showModal();
+});
+$("groups-dialog").querySelector("[data-close]").addEventListener("click", () => $("groups-dialog").close());
+
 /* ---------- Klicks & Ziehen in der Jahresansicht ---------- */
 let drag = null;
 
@@ -350,7 +390,7 @@ function highlightRange(a, b) {
 }
 
 $("year-view").addEventListener("mousedown", (e) => {
-  if (e.button !== 0) return;
+  if (e.button !== 0 || !canCreate(state.me)) return;          // Events anlegen nur als Admin oder Eventmanager
   if (e.target.closest(".ev, .kw")) return;
   const cell = e.target.closest(".day");
   if (!cell) return;
@@ -391,17 +431,25 @@ $("week-view").addEventListener("click", (e) => {
   const ev = e.target.closest(".ev");
   if (ev) { openEvent(Number(ev.dataset.id)); return; }
   const col = e.target.closest(".wcol");
-  if (col && !col.classList.contains("outside")) openEdit(null, col.dataset.date);
+  if (col && !col.classList.contains("outside") && canCreate(state.me)) openEdit(null, col.dataset.date);
 });
 
-/* ---------- Tooltip: wer hat geplant / gebucht ---------- */
+/* ---------- Tooltip: Kategorie, wer hat geplant / gebucht ---------- */
 const tip = $("tip");
 
 function fillTip(ev) {
   tip.replaceChildren();
-  tip.append(el("strong", null, ev.title));
+  tip.append(paint(el("span", "cat-badge", catName(ev)), ev), el("strong", null, ev.title));
   const days = daysBetween(parse(ev.start_date), parse(ev.end_date)) + 1;
   tip.append(el("div", "tip-dates", days > 1 ? `${fmt(ev.start_date)} – ${fmt(ev.end_date)} (${days} Tage)` : fmt(ev.start_date)));
+  if (refText(ev)) tip.append(el("div", "tip-dates", refText(ev)));
+  const gIn = groupNamesIn(ev, state.groups);
+  if (gIn.length) tip.append(el("div", "tip-dates", `Gruppe nimmt teil: ${gIn.join(", ")}`));
+  if (isGuest()) return;
+  if (ev.visibility === "private") {
+    tip.append(el("div", "tip-empty", ev.my_status ? `Status: ${ev.my_status}` : "nur für dich sichtbar"));
+    return;
+  }
   for (const status of ["gebucht", "geplant"]) {
     const names = ev.participants.filter((p) => p.status === status).map((p) => p.username);
     if (!names.length) continue;
@@ -409,7 +457,7 @@ function fillTip(ev) {
     row.append(el("span", `chip ${status}`, status), el("span", null, names.join(", ")));
     tip.append(row);
   }
-  if (!ev.participants.length) tip.append(el("div", "tip-empty", "noch niemand eingetragen"));
+  if (!ev.participants.length) tip.append(el("div", "tip-empty", noPeopleText(ev)));
   if (ev.creator) tip.append(el("div", "tip-empty", `angelegt von ${ev.creator}`));
 }
 
@@ -446,15 +494,11 @@ $("btn-prev").addEventListener("click", () => showWeek(iso(addDays(parse(state.w
 $("btn-next").addEventListener("click", () => showWeek(iso(addDays(parse(state.week), 7))));
 document.addEventListener("keydown", (e) => {
   if (!state.week || document.querySelector("dialog[open]")) return;
-  if (e.target.closest("input, textarea")) return;
+  if (e.target.closest("input, textarea, select")) return;
   if (e.key === "Escape") showYear();
   else if (e.key === "ArrowLeft" && !$("btn-prev").disabled) $("btn-prev").click();
   else if (e.key === "ArrowRight" && !$("btn-next").disabled) $("btn-next").click();
 });
-
-$("pf").addEventListener("toggle", () => { if ($("pf").open) buildPeoplePanel($("pf-panel"), onPeopleChange); });
-document.addEventListener("click", (e) => { if ($("pf").open && !e.target.closest("#pf")) $("pf").open = false; });
-document.addEventListener("keydown", (e) => { if (e.key === "Escape" && $("pf").open) { $("pf").open = false; e.stopImmediatePropagation(); } }, true);
 
 $("only-mine").addEventListener("change", (e) => {
   state.onlyMine = e.target.checked;
@@ -463,26 +507,57 @@ $("only-mine").addEventListener("change", (e) => {
 });
 
 setupPasswordDialog($("pw-dialog"), $("btn-password"));
+$("btn-feed").addEventListener("click", () => openFeedDialog(state.groups));
 $("pw-dialog").querySelector("[data-close]").addEventListener("click", () => $("pw-dialog").close());
 
 $("btn-logout").addEventListener("click", async () => {
   try { await api("POST", "/api/logout"); } finally { location.href = "/login"; }
 });
 
+// Benutzer-Menü oben rechts
+function setUserMenu(open) {
+  $("user-menu").hidden = !open;
+  $("btn-user").setAttribute("aria-expanded", String(open));
+}
+$("btn-user").addEventListener("click", (e) => { e.stopPropagation(); setUserMenu($("user-menu").hidden); });
+$("user-menu").addEventListener("click", () => setUserMenu(false));
+document.addEventListener("click", (e) => { if (!e.target.closest(".usermenu")) setUserMenu(false); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("user-menu").hidden) setUserMenu(false); });
+
+setupIntro("desktop", { banner: $("intro"), thumb: $("intro-thumb"), play: $("intro-play"), close: $("intro-close"),
+  buttons: [$("btn-intro")], dialog: $("video-dialog"), player: $("video-player") });
+
 /* ---------- Start ---------- */
 (async function init() {
   state.me = await api("GET", "/api/me");
   state.year = state.me.year;
   state.holidays = holidays(state.year);
-  document.title = `Kalender ${state.year}`;
-  $("title").textContent = `Kalender ${state.year}`;
-  $("username").textContent = state.me.username + (state.me.is_admin ? " (Admin)" : "");
-  try { state.onlyMine = localStorage.getItem("kal-only-mine") === "1"; } catch {}
+  document.title = `racingkalender.de ${state.year}`;
+  $("title").textContent = `racingkalender.de ${state.year}`;
+  $("username").textContent = state.me.username;
+  if (state.me.guest) {                                          // ohne Konto: nur ansehen
+    await loadGuestCfg();
+    for (const id of ["btn-groups", "btn-feed", "only-mine-label"]) $(id).hidden = true;
+    document.querySelector(".usermenu").hidden = true;
+    document.querySelector(".tb-filters .status-legend").hidden = true;
+    $("btn-login").hidden = false;
+    $("btn-register").hidden = !guestCfg.registration;
+    document.querySelector("#event-dialog .status-buttons").hidden = true;
+    $("ev-guest").replaceChildren(guestHint());
+    $("ev-guest").hidden = false;
+  }
+  try { state.onlyMine = !state.me.guest && localStorage.getItem("kal-only-mine") === "1"; } catch {}
   $("only-mine").checked = state.onlyMine;
-  loadPeopleFilter(await api("GET", "/api/users"));
+  loadCatFilter();
+  loadRefFilter();
   const m = location.hash.match(/^#w=(\d{4}-\d{2}-\d{2})$/);
   if (m) state.week = iso(mondayOf(parse(m[1])));
-  $("admin-link").hidden = !state.me.is_admin;
+  applyRole();
   await loadEvents();
   track(state.week ? "ansicht_woche" : "ansicht_jahr", state.week ? weekDetail(state.week) : "");
+  await handleJoinHash(async () => {
+    await reloadAll();
+    buildGroupsPanel($("groups-panel"), state.groups, reloadAll);
+    $("groups-dialog").showModal();
+  });
 })();

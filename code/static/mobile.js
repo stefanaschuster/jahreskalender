@@ -1,17 +1,24 @@
 "use strict";
 /* Smartphone-Ansicht: Jahresübersicht (12 Mini-Monate) → Monat mit Terminliste */
 
-const state = { version: null, me: null, year: 2027, events: [], holidays: new Map(), onlyMine: false,
+const state = { version: null, me: null, year: 2027, events: [], groups: [], holidays: new Map(), onlyMine: false,
   month: null, day: null, openId: null, editId: null };
 const RANK = { gebucht: 3, geplant: 2, offen: 1 };
 const statusOf = (ev) => ev.my_status || "offen";
+const byStatus = (a, b) => RANK[statusOf(b)] - RANK[statusOf(a)];
 
 /* ---------- Daten ---------- */
 async function loadEvents() {
   const { v } = await api("GET", "/api/version");
-  state.events = await api("GET", "/api/events");
+  [state.events, state.groups] = await Promise.all([api("GET", "/api/events"), api("GET", "/api/groups"), loadRefs()]);
   state.version = v;
+  buildRefFilter($("m-rf"), state.groups, render);
   render();
+}
+
+async function reloadAll() {
+  await loadEvents();
+  if ($("m-groups").open) buildGroupsPanel($("m-groups-panel"), state.groups, reloadAll);
 }
 
 let polling = false;
@@ -20,28 +27,26 @@ async function checkForUpdates() {
   polling = true;
   try {
     const { v } = await api("GET", "/api/version");
-    if (v !== state.version) await loadEvents();
+    if (v !== state.version) {
+      if (!state.me.guest) {                             // Rollen (z. B. Eventmanager) können sich geändert haben
+        state.me = await api("GET", "/api/me");
+        applyRole();
+      }
+      await loadEvents();
+    }
   } catch { /* offline: nächster Versuch */ }
   finally { polling = false; }
 }
 setInterval(checkForUpdates, 10000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) checkForUpdates(); });
 
-const visible = () => state.events.filter((e) => (!state.onlyMine || e.my_status) && matchesPeople(e));
-
-function renderPeopleFilter() {
-  const n = peopleFilter.names.size;
-  $("m-pf-btn").textContent = n ? `Teilnehmer (${n})` : "Teilnehmer";
-  $("m-pf-btn").classList.toggle("on", n > 0);
-  buildPeopleBar($("m-pf-bar"), visible().length, render);
+function applyRole() {
+  $("m-admin").hidden = !state.me.is_admin;
+  $("m-add").hidden = !canCreate(state.me);                     // Events anlegen nur als Admin oder Eventmanager
 }
+
+const visible = () => state.events.filter((e) => (!state.onlyMine || e.my_status) && matchesCat(e) && matchesRefs(e));
 const eventsOn = (dIso, list) => list.filter((e) => e.start_date <= dIso && e.end_date >= dIso);
-
-function bestStatus(list) {
-  let best = null;
-  for (const e of list) if (!best || RANK[statusOf(e)] > RANK[best]) best = statusOf(e);
-  return best;
-}
 
 /* ---------- Jahresübersicht ---------- */
 function renderYear() {
@@ -66,8 +71,8 @@ function renderYear() {
     for (let d = 1; d <= nDays; d++) {
       const dt = mk(state.year, m, d), dIso = iso(dt);
       const c = el("span", "md", String(d));
-      const st = bestStatus(eventsOn(dIso, evs));
-      if (st) c.classList.add(`s-${st}`);
+      const top = eventsOn(dIso, evs).sort(byStatus)[0];    // wichtigstes Event des Tages bestimmt die Farbe
+      if (top) { c.classList.add(`s-${statusOf(top)}`); paint(c, top); }
       if (wd(dt) >= 5) c.classList.add("we");
       if (state.holidays.has(dIso)) c.classList.add("hol");
       if (dIso === todayIso) c.classList.add("today");
@@ -98,14 +103,13 @@ function renderMonth() {
     cell.type = "button";
     cell.dataset.date = dIso;
     if (wd(dt) >= 5) cell.classList.add("we");
-    const hol = state.holidays.get(dIso);
-    if (hol) cell.classList.add("hol");
+    if (state.holidays.get(dIso)) cell.classList.add("hol");
     if (dIso === todayIso) cell.classList.add("today");
     if (dIso === state.day) cell.classList.add("sel");
     cell.append(el("span", "m-num", String(d)));
     const bars = el("span", "m-bars");
-    const on = eventsOn(dIso, evs).sort((a, b) => RANK[statusOf(b)] - RANK[statusOf(a)]);
-    for (const e of on.slice(0, 3)) bars.append(el("i", `s-${statusOf(e)}`));
+    const on = eventsOn(dIso, evs).sort(byStatus);
+    for (const e of on.slice(0, 3)) bars.append(paint(el("i", `s-${statusOf(e)}`), e));
     if (on.length > 3) bars.append(el("b", null, `+${on.length - 3}`));
     cell.append(bars);
     grid.append(cell);
@@ -123,6 +127,7 @@ function renderMonth() {
 
 function people(ev, cls) {
   const wrap = el("div", cls);
+  if (ev.visibility === "private") return wrap;
   for (const st of ["gebucht", "geplant"]) {
     const names = ev.participants.filter((p) => p.status === st).map((p) => p.username);
     if (!names.length) continue;
@@ -130,7 +135,7 @@ function people(ev, cls) {
     row.append(el("span", `chip ${st}`, st), el("span", null, names.join(", ")));
     wrap.append(row);
   }
-  if (!ev.participants.length) wrap.append(el("div", "muted", "noch niemand eingetragen"));
+  if (!ev.participants.length) wrap.append(el("div", "muted", noPeopleText(ev)));
   return wrap;
 }
 
@@ -153,23 +158,28 @@ function dateText(ev) {
 }
 
 function card(ev) {
-  const c = el("article", `m-card s-${statusOf(ev)}`);
+  const c = paint(el("article", `m-card s-${statusOf(ev)}`), ev);
   const head = el("button", "m-card-head");
   head.type = "button";
   head.dataset.open = ev.id;
-  head.append(el("strong", null, ev.title), el("span", "muted", dateText(ev)));
-  c.append(head, people(ev, "m-people"), statusButtons(ev));
+  head.append(el("span", "m-card-cat", catName(ev)), el("strong", null, ev.title), el("span", "muted", dateText(ev)));
+  c.append(head);
+  if (ev.organizer_id || ev.track_id) c.append(refLinks(ev, el("div", "refs")));
+  const gIn = groupNamesIn(ev, state.groups);
+  if (gIn.length) c.append(el("div", "muted small", `Gruppe nimmt teil: ${gIn.join(", ")}`));
+  if (!isGuest()) c.append(people(ev, "m-people"), statusButtons(ev));
   return c;
 }
 
 /* ---------- Navigation ---------- */
 function render() {
-  renderPeopleFilter();
+  buildLegend($("m-cats"), state.groups, render);
   const inMonth = state.month !== null;
   $("m-year").hidden = inMonth;
   $("m-month").hidden = !inMonth;
   $("m-back").hidden = !inMonth;
-  $("m-title").textContent = inMonth ? "" : `Kalender ${state.year}`;
+  $("m-title").textContent = inMonth ? "" : `racingkalender.de ${state.year}`;
+  $("m-groups-count").textContent = state.groups.length ? String(state.groups.length) : "";
   if (inMonth) renderMonth(); else renderYear();
   if (state.openId !== null) fillDetail();
 }
@@ -243,8 +253,7 @@ for (const d of document.querySelectorAll("dialog.sheet")) {
 /* ---------- Details ---------- */
 function openDetail(id) {
   state.openId = id;
-  const ev = state.events.find((x) => x.id === id);
-  if (ev) track("event_angesehen", ev.title);
+  track("event_angesehen", id);
   fillDetail();
   $("m-detail").showModal();
 }
@@ -252,13 +261,17 @@ function openDetail(id) {
 function fillDetail() {
   const ev = state.events.find((x) => x.id === state.openId);
   if (!ev) { $("m-detail").close(); return; }
+  paint($("d-cat"), ev).textContent = catName(ev);
   $("d-title").textContent = ev.title;
   $("d-dates").textContent = dateText(ev);
+  refLinks(ev, $("d-refs"));
+  groupParticipation(ev, state.groups, $("d-groups"), setGroupParticipation);
   $("d-note").textContent = ev.note;
   $("d-note").hidden = !ev.note;
   $("d-status").replaceWith(Object.assign(statusButtons(ev), { id: "d-status" }));
-  $("d-people").replaceChildren(people(ev, "m-people"));
-  $("d-creator").textContent = ev.creator ? `angelegt von ${ev.creator}` : "";
+  $("d-status").hidden = isGuest();
+  $("d-people").replaceChildren(isGuest() ? "" : people(ev, "m-people"));
+  $("d-creator").textContent = ev.creator && ev.visibility !== "private" && !isGuest() ? `angelegt von ${ev.creator}` : "";
   $("d-actions").hidden = !ev.can_edit;
 }
 $("m-detail").addEventListener("close", () => { state.openId = null; });
@@ -278,6 +291,15 @@ $("d-delete").addEventListener("click", async () => {
   } catch (err) { alert(err.message); }
 });
 
+async function setGroupParticipation(groupId, participates) {
+  const id = state.openId;
+  try {
+    const updated = await api("PUT", `/api/events/${id}/groups/${groupId}`, { participates });
+    state.events = state.events.map((e) => (e.id === id ? updated : e));
+    render();
+  } catch (err) { alert(err.message); render(); }
+}
+
 /* ---------- Anlegen / Bearbeiten ---------- */
 function openEdit(ev) {
   state.editId = ev ? ev.id : null;
@@ -293,11 +315,19 @@ function openEdit(ev) {
   f.start_date.value = ev ? ev.start_date : start;
   f.end_date.value = ev ? ev.end_date : start;
   f.note.value = ev ? ev.note : "";
+  fillVisibility(f.visibility, state.me, state.groups, ev);
+  fillOrganizerSelect(f, state.me, ev?.organizer_id);
+  fillRefSelect(f.track_id, "track", ev?.track_id);
   $("e-error").hidden = true;
   $("m-edit").showModal();
 }
 
 $("m-add").addEventListener("click", () => openEdit(null));
+$("e-form").visibility.addEventListener("change", (e) => {
+  tintSelect(e.target);
+  const f = $("e-form");
+  fillOrganizerSelect(f, state.me, refValue(f.organizer_id));
+});
 $("e-form").start_date.addEventListener("change", (e) => {
   const end = $("e-form").end_date;
   if (!end.value || end.value < e.target.value) end.value = e.target.value;
@@ -307,7 +337,11 @@ $("e-form").addEventListener("submit", async (e) => {
   const f = e.target;
   let start = f.start_date.value, end = f.end_date.value;
   if (end < start) [start, end] = [end, start];
-  const body = { title: f.title.value, start_date: start, end_date: end, note: f.note.value };
+  const body = { title: f.title.value, start_date: start, end_date: end, note: f.note.value,
+    organizer_id: refValue(f.organizer_id), track_id: refValue(f.track_id), ...visibilityBody(f.visibility) };
+  const old = state.editId && state.events.find((x) => x.id === state.editId);
+  if (old && old.participants.some((p) => p.username !== state.me.username) && catKey(old) !== f.visibility.value
+      && !confirm("Die Sichtbarkeit ändert sich. Wer das Event danach nicht mehr sieht, verliert seine Markierung. Fortfahren?")) return;
   try {
     if (state.editId) await api("PUT", `/api/events/${state.editId}`, body);
     else await api("POST", "/api/events", body);
@@ -321,9 +355,14 @@ $("e-form").addEventListener("submit", async (e) => {
 
 /* ---------- Menü ---------- */
 $("m-menu-btn").addEventListener("click", () => $("m-menu").showModal());
-$("m-pf-btn").addEventListener("click", () => {
-  buildPeoplePanel($("m-pf-panel"), render);
-  $("m-pf").showModal();
+$("m-intro-btn").addEventListener("click", () => $("m-menu").close());
+setupIntro("mobil", { banner: $("intro"), thumb: $("intro-thumb"), play: $("intro-play"), close: $("intro-close"),
+  buttons: [$("m-intro-btn")], dialog: $("video-dialog"), player: $("video-player") });
+$("m-groups-btn").addEventListener("click", () => {
+  $("m-menu").close();
+  buildGroupsPanel($("m-groups-panel"), state.groups, reloadAll);
+  $("m-groups").showModal();
+  document.activeElement?.blur();                     // keine Tastatur beim Öffnen
 });
 $("m-only-mine").addEventListener("change", (e) => {
   state.onlyMine = e.target.checked;
@@ -332,6 +371,7 @@ $("m-only-mine").addEventListener("change", (e) => {
 });
 setupPasswordDialog($("m-pw"), $("m-password"));
 $("m-password").addEventListener("click", () => $("m-menu").close(), true);
+$("m-feed").addEventListener("click", () => { $("m-menu").close(); openFeedDialog(state.groups); });
 
 $("m-logout").addEventListener("click", async () => {
   try { await api("POST", "/api/logout"); } finally { location.href = "/login"; }
@@ -342,15 +382,32 @@ $("m-logout").addEventListener("click", async () => {
   state.me = await api("GET", "/api/me");
   state.year = state.me.year;
   state.holidays = holidays(state.year);
-  document.title = `Kalender ${state.year}`;
-  $("m-user").textContent = `Angemeldet als ${state.me.username}`;
-  $("m-admin").hidden = !state.me.is_admin;
-  try { state.onlyMine = localStorage.getItem("kal-only-mine") === "1"; } catch {}
+  document.title = `racingkalender.de ${state.year}`;
+  $("m-user").textContent = state.me.guest ? "Nicht angemeldet" : `Angemeldet als ${state.me.username}`;
+  if (state.me.guest) {                                          // ohne Konto: nur ansehen
+    await loadGuestCfg();
+    for (const id of ["m-groups-btn", "m-only-mine-row", "m-feed", "m-password", "m-logout"]) $(id).hidden = true;
+    $("m-login").hidden = false;
+    $("m-register").hidden = !guestCfg.registration;
+    document.querySelector(".m-legend .status-legend").hidden = true;
+    $("guest-bar").replaceChildren(guestHint("Du siehst alle öffentlichen Trackdays. Melde dich an, um Events zu markieren und mit deiner Crew zu planen."));
+    $("guest-bar").hidden = false;
+    $("d-guest").replaceChildren(guestHint());
+    $("d-guest").hidden = false;
+  }
+  applyRole();
+  try { state.onlyMine = !state.me.guest && localStorage.getItem("kal-only-mine") === "1"; } catch {}
   $("m-only-mine").checked = state.onlyMine;
-  loadPeopleFilter(await api("GET", "/api/users"));
+  loadCatFilter();
+  loadRefFilter();
   const h = location.hash.match(/^#m=(\d{1,2})$/);
   if (h && h[1] >= 1 && h[1] <= 12) state.month = Number(h[1]) - 1;
   await loadEvents();
   track(state.month !== null ? "ansicht_monat" : "ansicht_jahr",
     state.month !== null ? `${MONTHS[state.month]} ${state.year}` : "Handy");
+  await handleJoinHash(async () => {
+    await reloadAll();
+    buildGroupsPanel($("m-groups-panel"), state.groups, reloadAll);
+    $("m-groups").showModal();
+  });
 })();

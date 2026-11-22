@@ -5,28 +5,37 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#f6f5f2" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#161614" media="(prefers-color-scheme: dark)">
-<title>Kalender</title>
+<title>racingkalender.de</title>
+<link rel="icon" href="data:,">
 <link rel="stylesheet" href="/static/style.css">
 <link rel="stylesheet" href="/static/mobile.css">
 </head>
 <body class="m">
 <header class="m-top">
   <button class="m-icon" id="m-back" aria-label="Zur Jahresübersicht" hidden>‹</button>
-  <h1 id="m-title">Kalender</h1>
-  <button class="m-pill" id="m-pf-btn">Teilnehmer</button>
+  <h1 id="m-title">racingkalender.de</h1>
   <button class="m-icon" id="m-menu-btn" aria-label="Menü">☰</button>
 </header>
 
-<div class="pf-bar" id="m-pf-bar" hidden></div>
-
 <main class="m-main">
+  <section class="intro m-intro" id="intro" hidden>
+    <button type="button" class="intro-thumb" id="intro-thumb" aria-label="Video abspielen"><span>▶</span></button>
+    <div class="intro-text">
+      <strong>Neu hier? So geht's in 25 Sekunden.</strong>
+      <span class="muted">Events sehen, Crew gründen, zusammen planen.</span>
+      <button type="button" class="btn primary" id="intro-play">Video ansehen</button>
+    </div>
+    <button type="button" class="btn icon" id="intro-close" aria-label="Hinweis ausblenden">✕</button>
+  </section>
+  <div class="guest-bar" id="guest-bar" hidden></div>
+  <div class="m-legend">
+    <div class="cats" id="m-cats"></div>
+    <span class="status-legend" aria-label="Farben: dein Status"><b>Mein Status:</b><span class="ev-sample">offen</span><span class="ev-sample geplant">geplant</span><span class="ev-sample gebucht">gebucht</span></span>
+    <div class="rf" id="m-rf"></div>
+  </div>
+
   <!-- Jahresübersicht -->
   <section id="m-year">
-    <div class="m-legend">
-      <span class="chip none">offen</span>
-      <span class="chip geplant">geplant</span>
-      <span class="chip gebucht">gebucht</span>
-    </div>
     <div class="m-months" id="m-months"></div>
   </section>
 
@@ -49,30 +58,48 @@
 <dialog class="sheet" id="m-menu">
   <div class="sheet-body">
     <p class="muted" id="m-user"></p>
-    <label class="m-row"><span>Nur meine Events</span><input type="checkbox" id="m-only-mine"></label>
+    <button class="m-row" id="m-intro-btn" hidden>So geht's (Video, 25 s)</button>
+    <button class="m-row" id="m-groups-btn">Gruppen <span class="muted" id="m-groups-count"></span></button>
+    <label class="m-row" id="m-only-mine-row"><span>Nur meine Events</span><input type="checkbox" id="m-only-mine"></label>
     <a class="m-row" id="m-admin" href="/admin" hidden>Admin-Seite</a>
+    <button class="m-row" id="m-feed">Kalender-Abo</button>
     <button class="m-row" id="m-password">Passwort ändern</button>
     <a class="m-row" href="/?ansicht=desktop">Desktop-Ansicht</a>
     <button class="m-row" id="m-logout">Abmelden</button>
+    <a class="m-row" id="m-login" href="/login" hidden>Anmelden</a>
+    <a class="m-row" id="m-register" href="/login#register" hidden>Kostenlos registrieren</a>
+    <p class="m-legal small"><a href="/static/impressum.html">Impressum</a> · <a href="/static/datenschutz.html">Datenschutz</a></p>
     <button class="btn m-close" data-close>Schließen</button>
   </div>
 </dialog>
 
-<!-- Teilnehmer-Filter -->
-<dialog class="sheet" id="m-pf">
+<!-- Erklär-Video -->
+<dialog class="video-dialog m-video" id="video-dialog">
+  <div class="video-wrap">
+    <video id="video-player" controls playsinline preload="none"></video>
+    <button type="button" class="btn icon video-close" data-close aria-label="Schließen">✕</button>
+  </div>
+</dialog>
+<!-- Gruppen -->
+<dialog class="sheet" id="m-groups">
   <div class="sheet-body">
-    <h2>Teilnehmer filtern</h2>
-    <div id="m-pf-panel" class="m-pf-panel"></div>
-    <button class="btn primary m-close" data-close>Fertig</button>
+    <h2>Gruppen</h2>
+    <p class="muted small">In einer Gruppe sieht jedes Mitglied die Events aller anderen Mitglieder dieser Gruppe.</p>
+    <div class="gp m-gp" id="m-groups-panel"></div>
+    <button class="btn m-close" data-close>Schließen</button>
   </div>
 </dialog>
 
 <!-- Event-Details -->
 <dialog class="sheet" id="m-detail">
   <div class="sheet-body">
+    <span class="cat-badge" id="d-cat"></span>
     <h2 id="d-title"></h2>
     <p class="muted" id="d-dates"></p>
+    <p class="refs" id="d-refs" hidden></p>
+    <div class="gpart" id="d-groups" hidden></div>
     <p class="note" id="d-note"></p>
+    <div id="d-guest" hidden></div>
     <div class="m-status" id="d-status"></div>
     <div id="d-people"></div>
     <p class="muted small" id="d-creator"></p>
@@ -93,6 +120,9 @@
       <label>Von <input name="start_date" type="date" required></label>
       <label>Bis <input name="end_date" type="date" required></label>
     </div>
+    <label>Veranstalter <select name="organizer_id"></select></label>
+    <label>Rennstrecke <select name="track_id"></select></label>
+    <label>Sichtbar für <select name="visibility" class="vis-select"></select></label>
     <label>Notiz <textarea name="note" rows="3" maxlength="2000"></textarea></label>
     <p class="error" id="e-error" hidden></p>
     <button type="submit" class="btn primary">Speichern</button>
@@ -106,8 +136,8 @@
     <h2>Passwort ändern</h2>
     <div class="pw-fields" data-fields>
       <label>Bisheriges Passwort <input name="old_password" type="password" autocomplete="current-password" required></label>
-      <label>Neues Passwort (mindestens 10 Zeichen) <input name="new_password" type="password" minlength="10" maxlength="256" autocomplete="new-password" required></label>
-      <label>Neues Passwort wiederholen <input name="new_password2" type="password" minlength="10" maxlength="256" autocomplete="new-password" required></label>
+      <label>Neues Passwort (mindestens 8 Zeichen) <input name="new_password" type="password" minlength="8" maxlength="256" autocomplete="new-password" required></label>
+      <label>Neues Passwort wiederholen <input name="new_password2" type="password" minlength="8" maxlength="256" autocomplete="new-password" required></label>
     </div>
     <p class="ok" data-ok hidden>Passwort geändert. Andere angemeldete Geräte wurden abgemeldet.</p>
     <p class="error" hidden></p>

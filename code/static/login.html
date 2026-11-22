@@ -3,23 +3,88 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Anmelden · Jahreskalender</title>
+<title>Anmelden · racingkalender.de</title>
+<link rel="icon" href="data:,">
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body class="login-body">
 <main class="login-card">
-  <h1>Jahreskalender</h1>
-  <form id="login-form" autocomplete="on">
-    <label>Benutzername
+  <h1>racingkalender.de</h1>
+  <p class="muted small" id="login-join" hidden>Nach der Anmeldung kannst du der Gruppe beitreten.</p>
+  <p class="ok" id="login-info" hidden></p>
+
+  <!-- Anmelden -->
+  <form id="f-login" data-mode="login" autocomplete="on">
+    <label>Benutzername oder E-Mail
       <input name="username" autocomplete="username" required autofocus>
     </label>
     <label>Passwort
       <input name="password" type="password" autocomplete="current-password" required>
     </label>
-    <p class="error" id="login-error" hidden></p>
+    <p class="error" hidden></p>
     <button type="submit" class="btn primary">Anmelden</button>
+    <p class="login-links small">
+      <a href="#forgot" data-go="forgot" data-needs="reset" hidden>Passwort vergessen?</a>
+      <a href="#register" data-go="register" data-needs="registration" hidden>Neu hier? Registrieren</a>
+    </p>
   </form>
+
+  <!-- Registrieren -->
+  <form id="f-register" data-mode="register" hidden>
+    <h2>Registrieren</h2>
+    <label>Benutzername
+      <input name="username" autocomplete="username" maxlength="64" pattern="[A-Za-z0-9._\-]{2,64}"
+             title="2–64 Zeichen: A–Z, a–z, 0–9, Punkt, Unterstrich, Bindestrich" required>
+    </label>
+    <label>E-Mail
+      <input name="email" type="email" autocomplete="email" maxlength="254" required>
+    </label>
+    <label>Passwort (mindestens 8 Zeichen)
+      <input name="password" type="password" autocomplete="new-password" minlength="8" maxlength="256" required>
+    </label>
+    <label>Passwort wiederholen
+      <input name="password2" type="password" autocomplete="new-password" minlength="8" maxlength="256" required>
+    </label>
+    <p class="muted small">Du bekommst eine Mail mit einem Bestätigungslink. Erst danach ist dein Konto aktiv.</p>
+    <p class="error" hidden></p>
+    <button type="submit" class="btn primary">Konto anlegen</button>
+    <p class="login-links small"><a href="#" data-go="login">Zurück zur Anmeldung</a></p>
+  </form>
+
+  <!-- Passwort vergessen -->
+  <form id="f-forgot" data-mode="forgot" hidden>
+    <h2>Passwort vergessen</h2>
+    <label>Benutzername oder E-Mail
+      <input name="login" autocomplete="username" maxlength="254" required>
+    </label>
+    <p class="muted small">Ist bei deinem Konto eine E-Mail-Adresse hinterlegt, bekommst du einen Link zum Setzen eines neuen Passworts.</p>
+    <p class="error" hidden></p>
+    <button type="submit" class="btn primary">Link anfordern</button>
+    <p class="login-links small"><a href="#" data-go="login">Zurück zur Anmeldung</a></p>
+  </form>
+
+  <!-- Neues Passwort (aus Mail-Link) -->
+  <form id="f-reset" data-mode="reset" hidden>
+    <h2>Neues Passwort</h2>
+    <label>Neues Passwort (mindestens 8 Zeichen)
+      <input name="password" type="password" autocomplete="new-password" minlength="8" maxlength="256" required>
+    </label>
+    <label>Wiederholen
+      <input name="password2" type="password" autocomplete="new-password" minlength="8" maxlength="256" required>
+    </label>
+    <p class="error" hidden></p>
+    <button type="submit" class="btn primary">Speichern und anmelden</button>
+  </form>
+
+  <!-- Bestätigung (aus Mail-Link) -->
+  <div id="f-confirm" data-mode="confirm" hidden>
+    <h2>Anmeldung bestätigen</h2>
+    <p class="muted" id="confirm-text">Einen Moment …</p>
+    <p class="error" hidden></p>
+    <p class="login-links small"><a href="#" data-go="login">Zur Anmeldung</a></p>
+  </div>
 </main>
+<p class="legal-links-foot"><a href="/">Ohne Anmeldung zum Kalender</a> · <a href="/static/impressum.html">Impressum</a> · <a href="/static/datenschutz.html">Datenschutz</a></p>
 <script src="/static/login.js"></script>
 </body>
 </html>

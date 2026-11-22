@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Admin · Jahreskalender</title>
+<title>Admin · racingkalender.de</title>
+<link rel="icon" href="data:,">
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
@@ -26,15 +27,63 @@
       <table class="data" id="users">
         <thead>
           <tr>
-            <th>Name</th><th>Rolle</th><th class="num">Logins</th><th>Letzter Login</th><th>Zuletzt aktiv</th>
+            <th>Name</th><th>E-Mail</th><th>Rolle</th><th class="num">Logins</th><th>Letzter Login</th><th>Zuletzt aktiv</th>
             <th class="num">Sitzungen</th><th class="num">Geplant</th><th class="num">Gebucht</th>
-            <th class="num">Events angelegt</th><th class="num">Aktionen</th><th>Verwalten</th>
+            <th class="num">Events angelegt</th><th class="num">Gruppen</th><th class="num">Aktionen</th><th>Verwalten</th>
           </tr>
         </thead>
         <tbody></tbody>
       </table>
     </div>
-    <p class="muted small">Klick auf einen Benutzer filtert das Protokoll.</p>
+    <p class="muted small">Klick auf einen Benutzer filtert das Protokoll. Titel privater und Gruppen-Events erscheinen nicht im Protokoll.</p>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>Veranstalter</h2>
+      <button class="btn primary" data-ref-add="organizers">+ Veranstalter</button>
+    </div>
+    <div class="table-wrap"><table class="data" id="ref-organizers"><thead></thead><tbody></tbody></table></div>
+    <p class="muted small" id="ref-organizers-empty" hidden>Noch keine Einträge.</p>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>Rennstrecken</h2>
+      <button class="btn primary" data-ref-add="tracks">+ Rennstrecke</button>
+    </div>
+    <div class="table-wrap"><table class="data" id="ref-tracks"><thead></thead><tbody></tbody></table></div>
+    <p class="muted small" id="ref-tracks-empty" hidden>Noch keine Einträge.</p>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>Kalender-Datei (ICS)</h2>
+      <a class="btn" href="/api/admin/export.ics" download>Export .ics</a>
+    </div>
+    <div class="ics-box">
+      <p class="muted small">Export: alle öffentlichen Events, z. B. für Google, Outlook oder Apple Kalender.
+        Import: Termine aus einer .ics-Datei werden als <strong>öffentliche</strong> Events angelegt.
+        Gleiche UID (Termin-Kennung) → das vorhandene Event wird aktualisiert statt doppelt angelegt.
+        Veranstalter und Rennstrecke werden über ihren Namen den Stammdaten zugeordnet.</p>
+      <form id="ics-form" class="ics-form">
+        <input type="file" id="ics-file" accept=".ics,text/calendar" required>
+        <label class="toggle"><input type="checkbox" id="ics-create"> unbekannte Veranstalter/Strecken anlegen</label>
+        <button type="submit" class="btn primary">Importieren</button>
+      </form>
+      <div id="ics-result" class="ics-result" hidden></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>Erklär-Videos</h2>
+    </div>
+    <div class="ics-box">
+      <p class="muted small">Werden oben in der Kalender-Übersicht angeboten („So geht's“): Desktop-Ansicht im Querformat (16:9),
+        Handy-Ansicht im Hochformat (9:16). MP4 (H.264), höchstens 9 MB.</p>
+      <div class="video-rows" id="video-rows"></div>
+    </div>
   </section>
 
   <section>
@@ -58,6 +107,7 @@
     <p class="muted small">Einträge älter als 180 Tage werden beim Start automatisch gelöscht.</p>
   </section>
 </main>
+<footer class="app-foot"><a href="/static/impressum.html">Impressum</a> · <a href="/static/datenschutz.html">Datenschutz</a></footer>
 
 <dialog id="user-dialog">
   <form class="dlg" id="user-form">
@@ -66,11 +116,26 @@
       <button type="button" class="btn icon" id="user-close" aria-label="Schließen">✕</button>
     </header>
     <label id="user-name-label">Name <input name="username" maxlength="64" pattern="[A-Za-z0-9._\-]{2,64}" autocomplete="off" required></label>
-    <label>Passwort (mindestens 10 Zeichen) <input name="password" type="text" minlength="10" maxlength="256" autocomplete="new-password" required></label>
+    <label id="user-email-label">E-Mail (optional, für „Passwort vergessen“) <input name="email" type="email" maxlength="254" autocomplete="off"></label>
+    <label id="user-pw-label">Passwort (mindestens 8 Zeichen) <input name="password" type="text" minlength="8" maxlength="256" autocomplete="new-password" required></label>
     <label class="toggle" id="user-admin-label"><input type="checkbox" name="is_admin"> Admin</label>
     <p class="error" id="user-error" hidden></p>
     <footer>
       <button type="button" class="btn" id="user-gen">Passwort erzeugen</button>
+      <button type="submit" class="btn primary">Speichern</button>
+    </footer>
+  </form>
+</dialog>
+
+<dialog id="ref-dialog">
+  <form class="dlg" id="ref-form">
+    <header>
+      <h2 id="ref-heading"></h2>
+      <button type="button" class="btn icon" id="ref-close" aria-label="Schließen">✕</button>
+    </header>
+    <div class="ref-fields" id="ref-fields"></div>
+    <p class="error" id="ref-error" hidden></p>
+    <footer>
       <button type="submit" class="btn primary">Speichern</button>
     </footer>
   </form>
