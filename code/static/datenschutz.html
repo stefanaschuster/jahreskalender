@@ -3,156 +3,97 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Datenschutz · racingkalender.de</title>
+<title data-i18n="privacy.title">Datenschutz · racingkalender.de</title>
 <link rel="icon" href="data:,">
+<script src="/static/i18n.js"></script>
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body class="legal-body">
 <main class="legal">
-  <p class="legal-eyebrow"><a href="/">← racingkalender.de</a></p>
-  <h1>Datenschutzerklärung</h1>
-  <p class="legal-stand">Stand: <span data-legal="stand">…</span></p>
+  <div class="legal-top">
+    <p class="legal-eyebrow"><a href="/" data-i18n="legal.back"></a></p>
+    <div class="lang" data-lang-switch></div>
+  </div>
+  <h1 data-i18n="privacy.h1"></h1>
+  <p class="legal-binding" data-i18n="legal.binding"></p>
+  <p class="legal-stand" data-i18n-html="privacy.stand"></p>
 
-  <h2>1. Verantwortlicher</h2>
+  <h2 data-i18n="privacy.s1"></h2>
   <div class="legal-block">
     <p><strong data-legal="name">…</strong></p>
     <p data-legal="strasse">…</p>
     <p data-legal="plzOrt">…</p>
-    <p>E-Mail: <a data-legal-mailto href="#">…</a></p>
+    <p data-i18n-html="legal.email"></p>
   </div>
-  <p>Ein Datenschutzbeauftragter ist nicht benannt, da die gesetzlichen
-     Voraussetzungen für eine Benennungspflicht nicht vorliegen.</p>
+  <p data-i18n="privacy.s1.dpo"></p>
 
-  <h2>2. Hosting</h2>
-  <p>Diese Website wird gehostet bei:
-     <strong data-legal="hosterName">…</strong>,
-     <span data-legal="hosterAnschrift">…</span>.
-     Beim Aufruf der Website verarbeitet der Server technisch bedingt
-     Verbindungsdaten (IP-Adresse, Zeitpunkt, aufgerufene Seite,
-     Browser-Kennung). Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO
-     (berechtigtes Interesse am sicheren und stabilen Betrieb).</p>
+  <h2 data-i18n="privacy.s2"></h2>
+  <p data-i18n-html="privacy.s2.text"></p>
 
-  <h2>3. Nutzerkonto und Registrierung</h2>
-  <p>Der Kalender ist nur mit Nutzerkonto nutzbar. Konten werden entweder
-     vom Administrator angelegt oder per Selbst-Registrierung. Dabei
-     verarbeiten wir:</p>
+  <h2 data-i18n="privacy.s3"></h2>
+  <p data-i18n="privacy.s3.intro"></p>
   <ul>
-    <li><strong>Benutzername</strong> – als Login-Kennung; er ist für
-        Mitglieder deiner Gruppen sichtbar</li>
-    <li><strong>E-Mail-Adresse</strong> – zur Bestätigung der Registrierung
-        (Double-Opt-In per Bestätigungslink, 24 Stunden gültig), zum
-        Zurücksetzen des Passworts (Link 1 Stunde gültig) und optional als
-        Login-Kennung. Sie ist für andere Nutzer nicht sichtbar.</li>
-    <li><strong>Passwort</strong> – ausschließlich als kryptografischer
-        Hash (scrypt) gespeichert, niemals im Klartext</li>
-    <li><strong>Zeitpunkt der Registrierung</strong></li>
+    <li data-i18n-html="privacy.s3.username"></li>
+    <li data-i18n-html="privacy.s3.email"></li>
+    <li data-i18n-html="privacy.s3.pw"></li>
+    <li data-i18n-html="privacy.s3.time"></li>
   </ul>
-  <p>Unbestätigte Registrierungen werden nach Ablauf des Bestätigungslinks
-     gelöscht. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO (Bereitstellung
-     des Nutzerkontos). Das Konto kann jederzeit durch Nachricht an die oben
-     genannte E-Mail-Adresse gelöscht werden; dabei werden auch die
-     privaten Termine und alle Markierungen (geplant/gebucht) des Kontos
-     entfernt.</p>
+  <p data-i18n="privacy.s3.text"></p>
 
-  <h2>4. E-Mail-Versand über Brevo</h2>
-  <p>Für den Versand von E-Mails (Bestätigung der Registrierung, Zurücksetzen
-     des Passworts, Benachrichtigung des Administrators über neue Konten)
-     nutzen wir den Dienst <strong>Brevo</strong> (Sendinblue GmbH,
-     Köpenicker Str. 126, 10179 Berlin) als Auftragsverarbeiter nach
-     Art. 28 DSGVO. Dabei werden die E-Mail-Adresse des Empfängers, der
-     Benutzername und der Inhalt der Nachricht an Brevo übermittelt.
-     Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO. Weitere Informationen:
-     <a href="https://www.brevo.com/de/legal/privacypolicy/" rel="noopener"
-        target="_blank">Datenschutzerklärung von Brevo</a>.</p>
+  <h2 data-i18n="privacy.s4"></h2>
+  <p data-i18n-html="privacy.s4.text"></p>
 
-  <h2>5. Termine, Status und Gruppen</h2>
-  <p>Kernfunktion ist ein gemeinsamer Jahreskalender. Gespeichert werden:</p>
+  <h2 data-i18n="privacy.s5"></h2>
+  <p data-i18n="privacy.s5.intro"></p>
   <ul>
-    <li><strong>Termine</strong> – öffentliche Termine (vom Administrator,
-        für alle Nutzer sichtbar), Gruppen-Termine (nur für Mitglieder der
-        Gruppe sichtbar) und private Termine (nur für dich sichtbar)</li>
-    <li><strong>Dein Status</strong> je Termin (geplant / gebucht) – sichtbar
-        nur für Nutzer, mit denen du in mindestens einer gemeinsamen Gruppe
-        bist</li>
-    <li><strong>Gruppen</strong> – Gruppenname, Mitgliedschaften, wer die
-        Gruppe gegründet hat und an welchen Terminen die Gruppe teilnimmt;
-        sichtbar für die Mitglieder der Gruppe</li>
+    <li data-i18n-html="privacy.s5.events"></li>
+    <li data-i18n-html="privacy.s5.status"></li>
+    <li data-i18n-html="privacy.s5.groups"></li>
   </ul>
-  <p>Termine und Markierungen können Rückschlüsse darauf zulassen, wann du
-     dich wo aufhalten möchtest. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b
-     DSGVO. Eigene Markierungen kannst du jederzeit zurücksetzen, Gruppen
-     jederzeit verlassen.</p>
+  <p data-i18n="privacy.s5.text"></p>
 
-  <h3>Kalender-Abo</h3>
-  <p>Auf Wunsch kannst du deine Termine über einen persönlichen, geheimen Link
-     in einer Kalender-App abonnieren. Diesen Link ruft deine Kalender-App ohne
-     Anmeldung regelmäßig ab; wer den Link kennt, sieht die darin enthaltenen
-     Termine. Nutzt du einen Online-Kalender (z. B. Google Kalender, iCloud,
-     Outlook), werden die Termine dabei an dessen Anbieter übertragen – das
-     geschieht auf deine Veranlassung und nach dessen Datenschutzbestimmungen.
-     Über „Neuen Link erzeugen“ kannst du den bisherigen Link jederzeit
-     ungültig machen.</p>
+  <h3 data-i18n="privacy.feed"></h3>
+  <p data-i18n="privacy.feed.text"></p>
 
-  <h3>Erklär-Video</h3>
-  <p>Das Erklär-Video liegt auf unserem eigenen Server und wird erst geladen, wenn
-     der Hinweis angezeigt wird oder du es startest. Es werden keine Videodienste
-     Dritter (z. B. YouTube) eingebunden.</p>
+  <h3 data-i18n="privacy.video"></h3>
+  <p data-i18n="privacy.video.text"></p>
 
-  <h2>6. Aktivitätsprotokoll und IP-Adressen</h2>
-  <p>Aktionen im Kalender (z. B. Login, Registrierung, Ansichten, Anlegen
-     und Ändern von Terminen, Statusänderungen, Gruppenbeitritte) werden mit
-     Zeitstempel, Benutzername und <strong>IP-Adresse</strong>
-     protokolliert. Titel privater und Gruppen-Termine werden dabei nicht
-     gespeichert; E-Mail-Adressen ebenfalls nicht. Zweck ist die
-     Missbrauchserkennung und die Absicherung des Betriebs
-     (Art. 6 Abs. 1 lit. f DSGVO). Einsehen kann das Protokoll nur der
-     Administrator. Die Einträge werden automatisch nach 180 Tagen
-     gelöscht.</p>
+  <h2 data-i18n="privacy.s6"></h2>
+  <p data-i18n-html="privacy.s6.text"></p>
 
-  <h2>7. Cookies und lokaler Speicher</h2>
-  <p>Die Website setzt ausschließlich technisch notwendige Cookies:</p>
+  <h2 data-i18n="privacy.s7"></h2>
+  <p data-i18n="privacy.s7.intro"></p>
   <ul>
-    <li><strong>Login-Cookie</strong> (Sitzungskennung, 30 Tage gültig) –
-        um angemeldete Nutzer zu erkennen</li>
-    <li><strong>Ansichts-Cookie</strong> (1 Jahr) – nur wenn du manuell
-        zwischen Handy- und Desktop-Ansicht umschaltest</li>
+    <li data-i18n-html="privacy.s7.login"></li>
+    <li data-i18n-html="privacy.s7.view"></li>
+    <li data-i18n-html="privacy.s7.lang"></li>
   </ul>
-  <p>Deine Filtereinstellungen (ausgeblendete Kategorien, Veranstalter-,
-     Strecken- und Gruppenfilter) und ob du den Hinweis auf das Erklär-Video
-     ausgeblendet hast, werden nur im lokalen Speicher deines Browsers abgelegt und nicht an den Server übertragen. Es werden keine
-     Tracking- oder Marketing-Cookies gesetzt, keine Analyse-Dienste und
-     keine externen Schriftarten oder Skripte Dritter eingebunden.
-     Rechtsgrundlage ist § 25 Abs. 2 Nr. 2 TDDDG i. V. m. Art. 6 Abs. 1
-     lit. b DSGVO.</p>
+  <p data-i18n="privacy.s7.text"></p>
 
-  <h2>8. Deine Rechte</h2>
-  <p>Du hast gegenüber dem Verantwortlichen folgende Rechte hinsichtlich
-     deiner personenbezogenen Daten:</p>
+  <h2 data-i18n="privacy.s8"></h2>
+  <p data-i18n="privacy.s8.intro"></p>
   <ul>
-    <li>Auskunft (Art. 15 DSGVO)</li>
-    <li>Berichtigung (Art. 16 DSGVO)</li>
-    <li>Löschung (Art. 17 DSGVO)</li>
-    <li>Einschränkung der Verarbeitung (Art. 18 DSGVO)</li>
-    <li>Datenübertragbarkeit (Art. 20 DSGVO)</li>
-    <li>Widerspruch gegen die Verarbeitung (Art. 21 DSGVO)</li>
+    <li data-i18n="privacy.s8.r15"></li>
+    <li data-i18n="privacy.s8.r16"></li>
+    <li data-i18n="privacy.s8.r17"></li>
+    <li data-i18n="privacy.s8.r18"></li>
+    <li data-i18n="privacy.s8.r20"></li>
+    <li data-i18n="privacy.s8.r21"></li>
   </ul>
-  <p>Zur Ausübung genügt eine formlose Nachricht an
-     <a data-legal-mailto href="#">…</a>.</p>
+  <p data-i18n-html="privacy.s8.text"></p>
 
-  <h2>9. Beschwerderecht bei der Aufsichtsbehörde</h2>
-  <p>Du hast das Recht, dich bei einer Datenschutz-Aufsichtsbehörde zu
-     beschweren. Zuständig für den Verantwortlichen ist:</p>
+  <h2 data-i18n="privacy.s9"></h2>
+  <p data-i18n="privacy.s9.text"></p>
   <div class="legal-block">
-    <p><strong>Der Landesbeauftragte für den Datenschutz und die
-       Informationsfreiheit Baden-Württemberg</strong></p>
-    <p>Lautenschlagerstraße 20, 70173 Stuttgart</p>
+    <p><strong data-i18n="privacy.s9.authority"></strong></p>
+    <p data-i18n="privacy.s9.address"></p>
     <p><a href="https://www.baden-wuerttemberg.datenschutz.de" rel="noopener"
           target="_blank">www.baden-wuerttemberg.datenschutz.de</a></p>
   </div>
 
   <footer class="legal-foot">
     <span>racingkalender.de</span>
-    <span><a href="/static/impressum.html">Impressum</a> · <a href="/static/datenschutz.html">Datenschutz</a></span>
+    <span><a href="/static/impressum.html" data-i18n="foot.imprint"></a> · <a href="/static/datenschutz.html" data-i18n="foot.privacy"></a></span>
   </footer>
 </main>
 <script src="/static/legal.js"></script>

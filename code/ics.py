@@ -58,6 +58,14 @@ def build(events: list[dict], cal_name: str, refresh_minutes: int = 0) -> str:
 
 # ---------- Lesen ----------
 
+class SkipError(ValueError):
+    """Grund, warum ein VEVENT nicht importiert wird: Schlüssel aus texts.json plus Platzhalter."""
+
+    def __init__(self, key: str, **values):
+        super().__init__(key)
+        self.key, self.values = key, values
+
+
 def _unesc(s: str) -> str:
     return re.sub(r"\\([\\;,nN])", lambda m: "\n" if m.group(1) in "nN" else m.group(1), s)
 
@@ -86,7 +94,7 @@ def _date(value: str) -> tuple[dt.date, bool]:
     """Liefert (Datum, ist_ganztägig). Uhrzeiten werden aufs Datum reduziert."""
     m = re.match(r"(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2}))?", value.strip())
     if not m:
-        raise ValueError(f"Datum unlesbar: {value[:30]}")
+        raise SkipError("import.skip.baddate", value=value[:30])
     d = dt.date(int(m[1]), int(m[2]), int(m[3]))
     if m[4] is None:
         return d, True
@@ -131,7 +139,8 @@ def extract_labels(text: str) -> tuple[dict, str]:
 
 
 def parse(text: str) -> list[dict]:
-    """Gibt je VEVENT ein dict zurück: uid, title, start, end (inkl.), note, location, organizer, track, skip."""
+    """Gibt je VEVENT ein dict zurück: uid, title, start, end (inkl.), note, location, organizer, track,
+    skip (None oder (Textschlüssel, Platzhalter))."""
     raw = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
     lines: list[str] = []
     for l in raw:                                   # Zeilen entfalten
@@ -168,7 +177,7 @@ def parse(text: str) -> list[dict]:
                 "note": _unesc(p.get("DESCRIPTION", "")).strip(), "location": _unesc(p.get("LOCATION", "")).strip(),
                 "organizer": _unesc(p.get("X-JAHRESPLANER-ORGANIZER", "")).strip()
                 or pa.get("ORGANIZER", {}).get("CN", "").strip(),
-                "track": _unesc(p.get("X-JAHRESPLANER-TRACK", "")).strip(), "skip": ""}
+                "track": _unesc(p.get("X-JAHRESPLANER-TRACK", "")).strip(), "skip": None}
         if not item["organizer"] and (org := p.get("ORGANIZER", "")):
             mail = re.sub(r"(?i)^mailto:", "", org).strip()
             if mail and "@" not in mail:
@@ -187,11 +196,11 @@ def parse(text: str) -> list[dict]:
             item["track_from_location"] = True
         try:
             if "RRULE" in p:
-                raise ValueError("Serientermin (RRULE) wird nicht unterstützt")
+                raise SkipError("import.skip.rrule")
             if p.get("STATUS", "").upper() == "CANCELLED":
-                raise ValueError("abgesagt (STATUS:CANCELLED)")
+                raise SkipError("import.skip.cancelled")
             if "DTSTART" not in p:
-                raise ValueError("kein Startdatum")
+                raise SkipError("import.skip.nostart")
             start, _ = _date(p["DTSTART"])
             if "DTEND" in p:
                 end, exclusive = _date(p["DTEND"])
@@ -204,9 +213,11 @@ def parse(text: str) -> list[dict]:
             if end < start:
                 end = start
             if not item["title"]:
-                raise ValueError("ohne Titel")
+                raise SkipError("import.skip.notitle")
             item.update(start=start, end=end)
-        except ValueError as ex:
-            item["skip"] = str(ex)
+        except SkipError as ex:
+            item["skip"] = (ex.key, ex.values)
+        except ValueError as ex:                    # z. B. Monat 13
+            item["skip"] = ("import.skip.baddate", {"value": str(ex)[:60]})
         out.append(item)
     return out

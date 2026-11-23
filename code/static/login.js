@@ -2,6 +2,8 @@
 /* Anmelden · Registrieren · Passwort vergessen · Links aus Mails (#confirm=…, #reset=…) */
 document.head.append(Object.assign(document.createElement("script"), { src: "/static/foot.js" }));
 const $ = (id) => document.getElementById(id);
+const t = (key, vars) => i18n.t(key, vars);
+const textsReady = new Promise((r) => document.addEventListener("i18n", r, { once: true }));
 const info = $("login-info");
 const forms = [...document.querySelectorAll("[data-mode]")];
 
@@ -9,10 +11,18 @@ const forms = [...document.querySelectorAll("[data-mode]")];
 const keepHash = /^#join=[A-Za-z0-9_-]{8,32}$/.test(location.hash) ? location.hash : "";
 $("login-join").hidden = !keepHash;
 
-function show(mode, message) {
+// Hinweis oben als Textschlüssel merken, damit er beim Sprachwechsel mitwechselt
+let infoMsg = null;
+function showInfo() {
+  info.textContent = infoMsg ? t(infoMsg.key, infoMsg.vars) : "";
+  info.hidden = !infoMsg;
+}
+document.addEventListener("i18n", showInfo);
+
+function show(mode, key, vars) {
   for (const f of forms) f.hidden = f.dataset.mode !== mode;
-  info.textContent = message || "";
-  info.hidden = !message;
+  infoMsg = key ? { key, vars } : null;
+  showInfo();
   for (const e of document.querySelectorAll(".error")) e.hidden = true;
   const first = document.querySelector(`[data-mode="${mode}"] input`);
   if (first) first.focus();
@@ -24,13 +34,23 @@ function fail(container, text) {
   e.hidden = false;
 }
 
+// Fehlermeldung des Servers: Textschlüssel, Schlüssel mit Platzhaltern oder Liste von Prüffehlern
+function errorText(detail, status) {
+  if (typeof detail === "string") return t(detail);
+  if (detail && typeof detail === "object" && !Array.isArray(detail) && detail.key) return t(detail.key, detail.values);
+  if (Array.isArray(detail)) {
+    return detail.map((x) => {
+      const m = /^Value error, (err\.\w+)$/.exec(x.msg || "");
+      return m ? t(m[1]) : t("err.invalid", { field: (x.loc || []).slice(-1)[0] ?? "" });
+    }).join(", ");
+  }
+  return t("err.http", { status });
+}
+
 async function post(url, body) {
   const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const d = data.detail;
-    throw new Error(Array.isArray(d) ? d.map((x) => x.msg).join(", ") : d || `Fehler ${res.status}`);
-  }
+  if (!res.ok) throw new Error(errorText(data.detail, res.status));
   return data;
 }
 
@@ -42,7 +62,7 @@ function handle(form, fn) {
     const btn = form.querySelector("[type=submit]");
     btn.disabled = true;
     try { await fn(form); }
-    catch (ex) { fail(form, ex.message === "Failed to fetch" ? "Server nicht erreichbar" : ex.message); }
+    catch (ex) { fail(form, ex instanceof TypeError ? t("err.offline") : ex.message); }
     finally { btn.disabled = false; }
   });
 }
@@ -53,31 +73,32 @@ handle($("f-login"), async (f) => {
 });
 
 handle($("f-register"), async (f) => {
-  if (f.password.value !== f.password2.value) throw new Error("Die Passwörter stimmen nicht überein");
+  if (f.password.value !== f.password2.value) throw new Error(t("err.pw_mismatch"));
   await post("/api/register", { username: f.username.value.trim(), email: f.email.value.trim(), password: f.password.value });
   const mail = f.email.value.trim();
   f.reset();
-  show("login", `Fast geschafft: Wir haben eine Mail an ${mail} geschickt. Klick auf den Link darin, um dein Konto zu aktivieren.`);
+  show("login", "login.sent", { mail });
 });
 
 handle($("f-forgot"), async (f) => {
   await post("/api/password/forgot", { login: f.login.value.trim() });
   f.reset();
-  show("login", "Falls es dazu ein Konto mit E-Mail-Adresse gibt, ist ein Link unterwegs. Er gilt eine Stunde.");
+  show("login", "login.reset_sent");
 });
 
 let resetToken = "";
 handle($("f-reset"), async (f) => {
-  if (f.password.value !== f.password2.value) throw new Error("Die Passwörter stimmen nicht überein");
+  if (f.password.value !== f.password2.value) throw new Error(t("err.pw_mismatch"));
   await post("/api/password/reset", { token: resetToken, password: f.password.value });
   location.href = "/";
 });
 
 async function confirmRegistration(token) {
   show("confirm");
+  $("confirm-text").textContent = t("login.wait");
   try {
     await post("/api/register/confirm", { token });
-    $("confirm-text").textContent = "Dein Konto ist aktiv. Du wirst angemeldet …";
+    $("confirm-text").textContent = t("login.active");
     setTimeout(() => { location.href = "/"; }, 900);
   } catch (ex) {
     $("confirm-text").hidden = true;
@@ -93,6 +114,7 @@ document.addEventListener("click", (e) => {
 });
 
 (async function init() {
+  await textsReady;
   try {
     const cfg = await (await fetch("/api/config")).json();
     for (const a of document.querySelectorAll("[data-needs]")) a.hidden = !cfg[a.dataset.needs];

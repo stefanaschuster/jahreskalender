@@ -5,59 +5,61 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>racingkalender.de</title>
 <link rel="icon" href="data:,">
+<script src="/static/i18n.js"></script>
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
 <header class="topbar">
   <div class="tb-row">
-    <h1 id="title">Kalender</h1>
+    <h1 id="title">racingkalender.de</h1>
     <nav class="viewnav" id="weeknav" hidden>
-      <button class="btn" id="btn-year" title="Zurück zur Jahresansicht (Esc)">← Jahr</button>
-      <button class="btn icon" id="btn-prev" title="Vorherige Woche (←)">‹</button>
+      <button class="btn" id="btn-year" data-i18n="top.year" data-i18n-attr="title:top.year_title"></button>
+      <button class="btn icon" id="btn-prev" data-i18n-attr="title:top.prev_week;aria-label:top.prev_week">‹</button>
       <span id="week-label"></span>
-      <button class="btn icon" id="btn-next" title="Nächste Woche (→)">›</button>
+      <button class="btn icon" id="btn-next" data-i18n-attr="title:top.next_week;aria-label:top.next_week">›</button>
     </nav>
     <div class="tb-actions">
-      <button class="btn ghost" id="btn-intro" hidden>▶ So geht's</button>
-      <a class="btn" id="btn-login" href="/login" hidden>Anmelden</a>
-      <a class="btn primary" id="btn-register" href="/login#register" hidden>Kostenlos registrieren</a>
-      <button class="btn" id="btn-groups">Gruppen</button>
-      <button class="btn" id="btn-feed" title="Termine im eigenen Kalender abonnieren">Kalender-Abo</button>
+      <button class="btn ghost" id="btn-intro" data-i18n="intro.btn" hidden></button>
+      <a class="btn" id="btn-login" href="/login" data-i18n="btn.login" hidden></a>
+      <a class="btn primary" id="btn-register" href="/login#register" data-i18n="btn.register" hidden></a>
+      <button class="btn" id="btn-groups" data-i18n="top.groups"></button>
+      <button class="btn" id="btn-feed" data-i18n="feed.title" data-i18n-attr="title:feed.btn_title"></button>
       <div class="usermenu">
         <button class="btn" id="btn-user" aria-haspopup="true" aria-expanded="false"><span id="username"></span> <span aria-hidden="true">▾</span></button>
         <div class="menu" id="user-menu" hidden>
-          <a id="admin-link" href="/admin" hidden>Admin-Seite</a>
-          <a href="/?ansicht=mobil">Handy-Ansicht</a>
-          <button type="button" id="btn-password">Passwort ändern</button>
-          <button type="button" id="btn-logout">Abmelden</button>
+          <a id="admin-link" href="/admin" data-i18n="top.admin" hidden></a>
+          <a href="/?ansicht=mobil" data-i18n="top.mobile"></a>
+          <button type="button" id="btn-password" data-i18n="pw.title"></button>
+          <button type="button" id="btn-logout" data-i18n="btn.logout"></button>
         </div>
       </div>
+      <div class="lang" data-lang-switch></div>
     </div>
   </div>
   <div class="tb-row tb-filters">
-    <div class="cats" id="cats" aria-label="Kategorien ein-/ausblenden"></div>
+    <div class="cats" id="cats" data-i18n-attr="aria-label:cat.aria"></div>
     <div class="rf" id="rf"></div>
-    <label class="toggle" id="only-mine-label"><input type="checkbox" id="only-mine"> nur meine</label>
-    <span id="admin-hint" hidden>Neues Event: Tage ziehen oder in der Woche Tag klicken</span>
-    <span class="status-legend" aria-label="Farben: dein Status"><b>Mein Status:</b><span class="ev-sample">offen</span><span class="ev-sample geplant">geplant</span><span class="ev-sample gebucht">gebucht</span></span>
+    <label class="toggle" id="only-mine-label"><input type="checkbox" id="only-mine"> <span data-i18n="filter.only_mine"></span></label>
+    <span id="admin-hint" data-i18n="top.new_hint" hidden></span>
+    <span class="status-legend" data-i18n-attr="aria-label:status.legend_aria"><b data-i18n="status.legend"></b><span class="ev-sample" data-i18n="status.offen"></span><span class="ev-sample geplant" data-i18n="status.geplant"></span><span class="ev-sample gebucht" data-i18n="status.gebucht"></span></span>
   </div>
 </header>
 
 <section class="intro" id="intro" hidden>
-  <button type="button" class="intro-thumb" id="intro-thumb" aria-label="Video abspielen"><span>▶</span></button>
+  <button type="button" class="intro-thumb" id="intro-thumb" data-i18n-attr="aria-label:intro.play_aria"><span>▶</span></button>
   <div class="intro-text">
-    <strong>Neu hier? So funktioniert's in 25 Sekunden.</strong>
-    <span class="muted">Alle Events sehen, eine Crew gründen, die Saison zusammen planen.</span>
+    <strong data-i18n="intro.head"></strong>
+    <span class="muted" data-i18n="intro.text"></span>
   </div>
-  <button type="button" class="btn primary" id="intro-play">Video ansehen</button>
-  <button type="button" class="btn icon" id="intro-close" aria-label="Hinweis ausblenden" title="Ausblenden">✕</button>
+  <button type="button" class="btn primary" id="intro-play" data-i18n="intro.watch"></button>
+  <button type="button" class="btn icon" id="intro-close" data-i18n-attr="aria-label:intro.hide;title:intro.hide_title">✕</button>
 </section>
 
 <main>
-  <section id="year-view" class="year" aria-label="Jahresansicht"></section>
-  <section id="week-view" class="week" aria-label="Wochenansicht" hidden></section>
+  <section id="year-view" class="year" data-i18n-attr="aria-label:top.year_view"></section>
+  <section id="week-view" class="week" data-i18n-attr="aria-label:top.week_view" hidden></section>
 </main>
-<footer class="app-foot"><a href="/static/impressum.html">Impressum</a> · <a href="/static/datenschutz.html">Datenschutz</a></footer>
+<footer class="app-foot"><a href="/static/impressum.html" data-i18n="foot.imprint"></a> · <a href="/static/datenschutz.html" data-i18n="foot.privacy"></a></footer>
 
 <dialog id="event-dialog">
   <form method="dialog" class="dlg">
@@ -66,7 +68,7 @@
         <span class="cat-badge" id="ev-cat"></span>
         <h2 id="ev-title"></h2>
       </div>
-      <button class="btn icon" value="close" aria-label="Schließen">✕</button>
+      <button class="btn icon" value="close" data-i18n-attr="aria-label:btn.close">✕</button>
     </header>
     <p id="ev-dates" class="muted"></p>
     <p id="ev-refs" class="refs" hidden></p>
@@ -74,16 +76,16 @@
     <p id="ev-creator" class="muted small"></p>
     <p id="ev-note" class="note"></p>
     <div id="ev-guest" hidden></div>
-    <div class="status-buttons" role="group" aria-label="Mein Status">
-      <button type="button" class="btn" data-status="">offen</button>
-      <button type="button" class="btn geplant" data-status="geplant">geplant</button>
-      <button type="button" class="btn gebucht" data-status="gebucht">gebucht</button>
+    <div class="status-buttons" role="group" data-i18n-attr="aria-label:status.group_aria">
+      <button type="button" class="btn" data-status="" data-i18n="status.offen"></button>
+      <button type="button" class="btn geplant" data-status="geplant" data-i18n="status.geplant"></button>
+      <button type="button" class="btn gebucht" data-status="gebucht" data-i18n="status.gebucht"></button>
     </div>
-    <h3 id="ev-people-head">Teilnehmer</h3>
+    <h3 id="ev-people-head" data-i18n="ev.participants"></h3>
     <ul id="ev-participants" class="participants"></ul>
     <footer id="ev-admin" hidden>
-      <button type="button" class="btn" id="ev-edit">Bearbeiten</button>
-      <button type="button" class="btn danger" id="ev-delete">Löschen</button>
+      <button type="button" class="btn" id="ev-edit" data-i18n="btn.edit"></button>
+      <button type="button" class="btn danger" id="ev-delete" data-i18n="btn.delete"></button>
     </footer>
   </form>
 </dialog>
@@ -91,23 +93,23 @@
 <dialog id="edit-dialog">
   <form class="dlg" id="edit-form">
     <header>
-      <h2 id="edit-heading">Neues Event</h2>
-      <button type="button" class="btn icon" id="edit-close" aria-label="Schließen">✕</button>
+      <h2 id="edit-heading"></h2>
+      <button type="button" class="btn icon" id="edit-close" data-i18n-attr="aria-label:btn.close">✕</button>
     </header>
-    <label>Titel <input name="title" maxlength="120" required></label>
+    <label><span data-i18n="ev.f.title"></span> <input name="title" maxlength="120" required></label>
     <div class="row">
-      <label>Von <input name="start_date" type="date" required></label>
-      <label>Bis <input name="end_date" type="date" required></label>
+      <label><span data-i18n="ev.f.from"></span> <input name="start_date" type="date" required></label>
+      <label><span data-i18n="ev.f.to"></span> <input name="end_date" type="date" required></label>
     </div>
     <div class="row">
-      <label>Veranstalter <select name="organizer_id"></select></label>
-      <label>Rennstrecke <select name="track_id"></select></label>
+      <label><span data-i18n="ev.f.organizer"></span> <select name="organizer_id"></select></label>
+      <label><span data-i18n="ev.f.track"></span> <select name="track_id"></select></label>
     </div>
-    <label>Sichtbar für <select name="visibility" class="vis-select"></select></label>
-    <label>Notiz <textarea name="note" rows="3" maxlength="2000"></textarea></label>
+    <label><span data-i18n="ev.f.visibility"></span> <select name="visibility" class="vis-select"></select></label>
+    <label><span data-i18n="ev.f.note"></span> <textarea name="note" rows="3" maxlength="2000"></textarea></label>
     <p class="error" id="edit-error" hidden></p>
     <footer>
-      <button type="submit" class="btn primary">Speichern</button>
+      <button type="submit" class="btn primary" data-i18n="btn.save"></button>
     </footer>
   </form>
 </dialog>
@@ -115,10 +117,10 @@
 <dialog id="groups-dialog" class="wide">
   <div class="dlg">
     <header>
-      <h2>Gruppen</h2>
-      <button type="button" class="btn icon" data-close aria-label="Schließen">✕</button>
+      <h2 data-i18n="groups.title"></h2>
+      <button type="button" class="btn icon" data-close data-i18n-attr="aria-label:btn.close">✕</button>
     </header>
-    <p class="muted small">In einer Gruppe sieht jedes Mitglied die Events aller anderen Mitglieder dieser Gruppe.</p>
+    <p class="muted small" data-i18n="groups.intro"></p>
     <div class="gp" id="groups-panel"></div>
   </div>
 </dialog>
@@ -126,18 +128,18 @@
 <dialog id="pw-dialog">
   <form class="dlg">
     <header>
-      <h2>Passwort ändern</h2>
-      <button type="button" class="btn icon" data-close aria-label="Schließen">✕</button>
+      <h2 data-i18n="pw.title"></h2>
+      <button type="button" class="btn icon" data-close data-i18n-attr="aria-label:btn.close">✕</button>
     </header>
     <div class="pw-fields" data-fields>
-      <label>Bisheriges Passwort <input name="old_password" type="password" autocomplete="current-password" required></label>
-      <label>Neues Passwort (mindestens 8 Zeichen) <input name="new_password" type="password" minlength="8" maxlength="256" autocomplete="new-password" required></label>
-      <label>Neues Passwort wiederholen <input name="new_password2" type="password" minlength="8" maxlength="256" autocomplete="new-password" required></label>
+      <label><span data-i18n="pw.old"></span> <input name="old_password" type="password" autocomplete="current-password" required></label>
+      <label><span data-i18n="pw.new"></span> <input name="new_password" type="password" minlength="8" maxlength="256" autocomplete="new-password" required></label>
+      <label><span data-i18n="pw.new2"></span> <input name="new_password2" type="password" minlength="8" maxlength="256" autocomplete="new-password" required></label>
     </div>
-    <p class="ok" data-ok hidden>Passwort geändert. Andere angemeldete Geräte wurden abgemeldet.</p>
+    <p class="ok" data-ok data-i18n="pw.ok" hidden></p>
     <p class="error" hidden></p>
     <footer>
-      <button type="submit" class="btn primary">Speichern</button>
+      <button type="submit" class="btn primary" data-i18n="btn.save"></button>
     </footer>
   </form>
 </dialog>
@@ -145,7 +147,7 @@
 <dialog id="video-dialog" class="video-dialog">
   <div class="video-wrap">
     <video id="video-player" controls playsinline preload="none"></video>
-    <button type="button" class="btn icon video-close" data-close aria-label="Schließen">✕</button>
+    <button type="button" class="btn icon video-close" data-close data-i18n-attr="aria-label:btn.close">✕</button>
   </div>
 </dialog>
 

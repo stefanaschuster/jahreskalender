@@ -304,3 +304,6 @@ body.m .rf-select:nth-child(3) { grid-column: 1 / -1; }
 .guest-bar { margin-bottom: 12px; }
 body.m .guest-acts .btn { padding: 9px 14px; font-size: 15px; }
 .m-status[hidden] { display: none; }
+
+/* Umschalter DE | EN im Kopf: größere Tippflächen */
+.m-top .lang button { padding: 10px 4px; }

@@ -7,30 +7,32 @@
 <meta name="theme-color" content="#161614" media="(prefers-color-scheme: dark)">
 <title>racingkalender.de</title>
 <link rel="icon" href="data:,">
+<script src="/static/i18n.js"></script>
 <link rel="stylesheet" href="/static/style.css">
 <link rel="stylesheet" href="/static/mobile.css">
 </head>
 <body class="m">
 <header class="m-top">
-  <button class="m-icon" id="m-back" aria-label="Zur Jahresübersicht" hidden>‹</button>
+  <button class="m-icon" id="m-back" data-i18n-attr="aria-label:m.back" hidden>‹</button>
   <h1 id="m-title">racingkalender.de</h1>
-  <button class="m-icon" id="m-menu-btn" aria-label="Menü">☰</button>
+  <div class="lang" data-lang-switch></div>
+  <button class="m-icon" id="m-menu-btn" data-i18n-attr="aria-label:m.menu">☰</button>
 </header>
 
 <main class="m-main">
   <section class="intro m-intro" id="intro" hidden>
-    <button type="button" class="intro-thumb" id="intro-thumb" aria-label="Video abspielen"><span>▶</span></button>
+    <button type="button" class="intro-thumb" id="intro-thumb" data-i18n-attr="aria-label:intro.play_aria"><span>▶</span></button>
     <div class="intro-text">
-      <strong>Neu hier? So geht's in 25 Sekunden.</strong>
-      <span class="muted">Events sehen, Crew gründen, zusammen planen.</span>
-      <button type="button" class="btn primary" id="intro-play">Video ansehen</button>
+      <strong data-i18n="intro.head_m"></strong>
+      <span class="muted" data-i18n="intro.text_m"></span>
+      <button type="button" class="btn primary" id="intro-play" data-i18n="intro.watch"></button>
     </div>
-    <button type="button" class="btn icon" id="intro-close" aria-label="Hinweis ausblenden">✕</button>
+    <button type="button" class="btn icon" id="intro-close" data-i18n-attr="aria-label:intro.hide">✕</button>
   </section>
   <div class="guest-bar" id="guest-bar" hidden></div>
   <div class="m-legend">
     <div class="cats" id="m-cats"></div>
-    <span class="status-legend" aria-label="Farben: dein Status"><b>Mein Status:</b><span class="ev-sample">offen</span><span class="ev-sample geplant">geplant</span><span class="ev-sample gebucht">gebucht</span></span>
+    <span class="status-legend" data-i18n-attr="aria-label:status.legend_aria"><b data-i18n="status.legend"></b><span class="ev-sample" data-i18n="status.offen"></span><span class="ev-sample geplant" data-i18n="status.geplant"></span><span class="ev-sample gebucht" data-i18n="status.gebucht"></span></span>
     <div class="rf" id="m-rf"></div>
   </div>
 
@@ -42,9 +44,9 @@
   <!-- Monat -->
   <section id="m-month" hidden>
     <nav class="m-monthnav">
-      <button class="m-icon" id="m-prev" aria-label="Vorheriger Monat">‹</button>
+      <button class="m-icon" id="m-prev" data-i18n-attr="aria-label:m.prev_month">‹</button>
       <h2 id="m-month-title"></h2>
-      <button class="m-icon" id="m-next" aria-label="Nächster Monat">›</button>
+      <button class="m-icon" id="m-next" data-i18n-attr="aria-label:m.next_month">›</button>
     </nav>
     <div class="m-grid" id="m-grid"></div>
     <h3 class="m-listhead" id="m-listhead"></h3>
@@ -52,24 +54,24 @@
   </section>
 </main>
 
-<button class="m-fab" id="m-add" aria-label="Neues Event">+</button>
+<button class="m-fab" id="m-add" data-i18n-attr="aria-label:m.add">+</button>
 
 <!-- Menü -->
 <dialog class="sheet" id="m-menu">
   <div class="sheet-body">
     <p class="muted" id="m-user"></p>
-    <button class="m-row" id="m-intro-btn" hidden>So geht's (Video, 25 s)</button>
-    <button class="m-row" id="m-groups-btn">Gruppen <span class="muted" id="m-groups-count"></span></button>
-    <label class="m-row" id="m-only-mine-row"><span>Nur meine Events</span><input type="checkbox" id="m-only-mine"></label>
-    <a class="m-row" id="m-admin" href="/admin" hidden>Admin-Seite</a>
-    <button class="m-row" id="m-feed">Kalender-Abo</button>
-    <button class="m-row" id="m-password">Passwort ändern</button>
-    <a class="m-row" href="/?ansicht=desktop">Desktop-Ansicht</a>
-    <button class="m-row" id="m-logout">Abmelden</button>
-    <a class="m-row" id="m-login" href="/login" hidden>Anmelden</a>
-    <a class="m-row" id="m-register" href="/login#register" hidden>Kostenlos registrieren</a>
-    <p class="m-legal small"><a href="/static/impressum.html">Impressum</a> · <a href="/static/datenschutz.html">Datenschutz</a></p>
-    <button class="btn m-close" data-close>Schließen</button>
+    <button class="m-row" id="m-intro-btn" data-i18n="intro.menu" hidden></button>
+    <button class="m-row" id="m-groups-btn"><span data-i18n="groups.title"></span> <span class="muted" id="m-groups-count"></span></button>
+    <label class="m-row" id="m-only-mine-row"><span data-i18n="m.only_mine"></span><input type="checkbox" id="m-only-mine"></label>
+    <a class="m-row" id="m-admin" href="/admin" data-i18n="top.admin" hidden></a>
+    <button class="m-row" id="m-feed" data-i18n="feed.title"></button>
+    <button class="m-row" id="m-password" data-i18n="pw.title"></button>
+    <a class="m-row" href="/?ansicht=desktop" data-i18n="m.desktop"></a>
+    <button class="m-row" id="m-logout" data-i18n="btn.logout"></button>
+    <a class="m-row" id="m-login" href="/login" data-i18n="btn.login" hidden></a>
+    <a class="m-row" id="m-register" href="/login#register" data-i18n="btn.register" hidden></a>
+    <p class="m-legal small"><a href="/static/impressum.html" data-i18n="foot.imprint"></a> · <a href="/static/datenschutz.html" data-i18n="foot.privacy"></a></p>
+    <button class="btn m-close" data-close data-i18n="btn.close"></button>
   </div>
 </dialog>
 
@@ -77,16 +79,16 @@
 <dialog class="video-dialog m-video" id="video-dialog">
   <div class="video-wrap">
     <video id="video-player" controls playsinline preload="none"></video>
-    <button type="button" class="btn icon video-close" data-close aria-label="Schließen">✕</button>
+    <button type="button" class="btn icon video-close" data-close data-i18n-attr="aria-label:btn.close">✕</button>
   </div>
 </dialog>
 <!-- Gruppen -->
 <dialog class="sheet" id="m-groups">
   <div class="sheet-body">
-    <h2>Gruppen</h2>
-    <p class="muted small">In einer Gruppe sieht jedes Mitglied die Events aller anderen Mitglieder dieser Gruppe.</p>
+    <h2 data-i18n="groups.title"></h2>
+    <p class="muted small" data-i18n="groups.intro"></p>
     <div class="gp m-gp" id="m-groups-panel"></div>
-    <button class="btn m-close" data-close>Schließen</button>
+    <button class="btn m-close" data-close data-i18n="btn.close"></button>
   </div>
 </dialog>
 
@@ -104,45 +106,45 @@
     <div id="d-people"></div>
     <p class="muted small" id="d-creator"></p>
     <div class="m-actions" id="d-actions" hidden>
-      <button class="btn" id="d-edit">Bearbeiten</button>
-      <button class="btn danger" id="d-delete">Löschen</button>
+      <button class="btn" id="d-edit" data-i18n="btn.edit"></button>
+      <button class="btn danger" id="d-delete" data-i18n="btn.delete"></button>
     </div>
-    <button class="btn m-close" data-close>Schließen</button>
+    <button class="btn m-close" data-close data-i18n="btn.close"></button>
   </div>
 </dialog>
 
 <!-- Anlegen / Bearbeiten -->
 <dialog class="sheet" id="m-edit">
   <form class="sheet-body" id="e-form">
-    <h2 id="e-heading">Neues Event</h2>
-    <label>Titel <input name="title" maxlength="120" required></label>
+    <h2 id="e-heading"></h2>
+    <label><span data-i18n="ev.f.title"></span> <input name="title" maxlength="120" required></label>
     <div class="m-two">
-      <label>Von <input name="start_date" type="date" required></label>
-      <label>Bis <input name="end_date" type="date" required></label>
+      <label><span data-i18n="ev.f.from"></span> <input name="start_date" type="date" required></label>
+      <label><span data-i18n="ev.f.to"></span> <input name="end_date" type="date" required></label>
     </div>
-    <label>Veranstalter <select name="organizer_id"></select></label>
-    <label>Rennstrecke <select name="track_id"></select></label>
-    <label>Sichtbar für <select name="visibility" class="vis-select"></select></label>
-    <label>Notiz <textarea name="note" rows="3" maxlength="2000"></textarea></label>
+    <label><span data-i18n="ev.f.organizer"></span> <select name="organizer_id"></select></label>
+    <label><span data-i18n="ev.f.track"></span> <select name="track_id"></select></label>
+    <label><span data-i18n="ev.f.visibility"></span> <select name="visibility" class="vis-select"></select></label>
+    <label><span data-i18n="ev.f.note"></span> <textarea name="note" rows="3" maxlength="2000"></textarea></label>
     <p class="error" id="e-error" hidden></p>
-    <button type="submit" class="btn primary">Speichern</button>
-    <button type="button" class="btn m-close" data-close>Abbrechen</button>
+    <button type="submit" class="btn primary" data-i18n="btn.save"></button>
+    <button type="button" class="btn m-close" data-close data-i18n="btn.cancel"></button>
   </form>
 </dialog>
 
 <!-- Passwort ändern -->
 <dialog class="sheet" id="m-pw">
   <form class="sheet-body">
-    <h2>Passwort ändern</h2>
+    <h2 data-i18n="pw.title"></h2>
     <div class="pw-fields" data-fields>
-      <label>Bisheriges Passwort <input name="old_password" type="password" autocomplete="current-password" required></label>
-      <label>Neues Passwort (mindestens 8 Zeichen) <input name="new_password" type="password" minlength="8" maxlength="256" autocomplete="new-password" required></label>
-      <label>Neues Passwort wiederholen <input name="new_password2" type="password" minlength="8" maxlength="256" autocomplete="new-password" required></label>
+      <label><span data-i18n="pw.old"></span> <input name="old_password" type="password" autocomplete="current-password" required></label>
+      <label><span data-i18n="pw.new"></span> <input name="new_password" type="password" minlength="8" maxlength="256" autocomplete="new-password" required></label>
+      <label><span data-i18n="pw.new2"></span> <input name="new_password2" type="password" minlength="8" maxlength="256" autocomplete="new-password" required></label>
     </div>
-    <p class="ok" data-ok hidden>Passwort geändert. Andere angemeldete Geräte wurden abgemeldet.</p>
+    <p class="ok" data-ok data-i18n="pw.ok" hidden></p>
     <p class="error" hidden></p>
-    <button type="submit" class="btn primary">Speichern</button>
-    <button type="button" class="btn m-close" data-close>Schließen</button>
+    <button type="submit" class="btn primary" data-i18n="btn.save"></button>
+    <button type="button" class="btn m-close" data-close data-i18n="btn.close"></button>
   </form>
 </dialog>
 

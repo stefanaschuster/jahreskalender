@@ -3,73 +3,73 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Admin · racingkalender.de</title>
+<title data-i18n="admin.title">Admin · racingkalender.de</title>
 <link rel="icon" href="data:,">
+<script src="/static/i18n.js"></script>
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
 <header class="topbar">
-  <h1>Admin</h1>
-  <a class="btn" href="/">← Kalender</a>
+  <h1 data-i18n="admin.h1"></h1>
+  <a class="btn" href="/" data-i18n="admin.calendar"></a>
   <div class="userbox">
     <span id="username"></span>
-    <button class="btn" id="btn-logout">Abmelden</button>
+    <button class="btn" id="btn-logout" data-i18n="btn.logout"></button>
+    <div class="lang" data-lang-switch></div>
   </div>
 </header>
 
 <main class="admin">
   <section>
     <div class="section-head">
-      <h2>Benutzer</h2>
-      <button class="btn primary" id="btn-add-user">+ Benutzer</button>
+      <h2 data-i18n="admin.users"></h2>
+      <button class="btn primary" id="btn-add-user" data-i18n="admin.add_user"></button>
     </div>
     <div class="table-wrap">
       <table class="data" id="users">
         <thead>
           <tr>
-            <th>Name</th><th>E-Mail</th><th>Rolle</th><th class="num">Logins</th><th>Letzter Login</th><th>Zuletzt aktiv</th>
-            <th class="num">Sitzungen</th><th class="num">Geplant</th><th class="num">Gebucht</th>
-            <th class="num">Events angelegt</th><th class="num">Gruppen</th><th class="num">Aktionen</th><th>Verwalten</th>
+            <th data-i18n="admin.col.name"></th><th data-i18n="admin.col.email"></th><th data-i18n="admin.col.role"></th>
+            <th class="num" data-i18n="admin.col.logins"></th><th data-i18n="admin.col.last_login"></th><th data-i18n="admin.col.last_seen"></th>
+            <th class="num" data-i18n="admin.col.sessions"></th><th class="num" data-i18n="admin.col.planned"></th><th class="num" data-i18n="admin.col.booked"></th>
+            <th class="num" data-i18n="admin.col.events"></th><th class="num" data-i18n="admin.col.groups"></th><th class="num" data-i18n="admin.col.actions"></th><th data-i18n="admin.col.manage"></th>
           </tr>
         </thead>
         <tbody></tbody>
       </table>
     </div>
-    <p class="muted small">Klick auf einen Benutzer filtert das Protokoll. Titel privater und Gruppen-Events erscheinen nicht im Protokoll.</p>
+    <p class="muted small" data-i18n="admin.users_hint"></p>
   </section>
 
   <section>
     <div class="section-head">
-      <h2>Veranstalter</h2>
-      <button class="btn primary" data-ref-add="organizers">+ Veranstalter</button>
+      <h2 data-i18n="admin.organizers"></h2>
+      <button class="btn primary" data-ref-add="organizers" data-i18n="admin.add_organizer"></button>
     </div>
     <div class="table-wrap"><table class="data" id="ref-organizers"><thead></thead><tbody></tbody></table></div>
-    <p class="muted small" id="ref-organizers-empty" hidden>Noch keine Einträge.</p>
+    <p class="muted small" id="ref-organizers-empty" data-i18n="admin.empty" hidden></p>
   </section>
 
   <section>
     <div class="section-head">
-      <h2>Rennstrecken</h2>
-      <button class="btn primary" data-ref-add="tracks">+ Rennstrecke</button>
+      <h2 data-i18n="admin.tracks"></h2>
+      <button class="btn primary" data-ref-add="tracks" data-i18n="admin.add_track"></button>
     </div>
     <div class="table-wrap"><table class="data" id="ref-tracks"><thead></thead><tbody></tbody></table></div>
-    <p class="muted small" id="ref-tracks-empty" hidden>Noch keine Einträge.</p>
+    <p class="muted small" id="ref-tracks-empty" data-i18n="admin.empty" hidden></p>
   </section>
 
   <section>
     <div class="section-head">
-      <h2>Kalender-Datei (ICS)</h2>
-      <a class="btn" href="/api/admin/export.ics" download>Export .ics</a>
+      <h2 data-i18n="admin.ics"></h2>
+      <a class="btn" href="/api/admin/export.ics" download data-i18n="admin.export"></a>
     </div>
     <div class="ics-box">
-      <p class="muted small">Export: alle öffentlichen Events, z. B. für Google, Outlook oder Apple Kalender.
-        Import: Termine aus einer .ics-Datei werden als <strong>öffentliche</strong> Events angelegt.
-        Gleiche UID (Termin-Kennung) → das vorhandene Event wird aktualisiert statt doppelt angelegt.
-        Veranstalter und Rennstrecke werden über ihren Namen den Stammdaten zugeordnet.</p>
+      <p class="muted small" data-i18n-html="admin.ics_hint"></p>
       <form id="ics-form" class="ics-form">
         <input type="file" id="ics-file" accept=".ics,text/calendar" required>
-        <label class="toggle"><input type="checkbox" id="ics-create"> unbekannte Veranstalter/Strecken anlegen</label>
-        <button type="submit" class="btn primary">Importieren</button>
+        <label class="toggle"><input type="checkbox" id="ics-create"> <span data-i18n="admin.ics_create"></span></label>
+        <button type="submit" class="btn primary" data-i18n="admin.import"></button>
       </form>
       <div id="ics-result" class="ics-result" hidden></div>
     </div>
@@ -77,52 +77,51 @@
 
   <section>
     <div class="section-head">
-      <h2>Erklär-Videos</h2>
+      <h2 data-i18n="admin.videos"></h2>
     </div>
     <div class="ics-box">
-      <p class="muted small">Werden oben in der Kalender-Übersicht angeboten („So geht's“): Desktop-Ansicht im Querformat (16:9),
-        Handy-Ansicht im Hochformat (9:16). MP4 (H.264), höchstens 9 MB.</p>
+      <p class="muted small" data-i18n="admin.videos_hint"></p>
       <div class="video-rows" id="video-rows"></div>
     </div>
   </section>
 
   <section>
     <div class="section-head">
-      <h2>Aktivität</h2>
+      <h2 data-i18n="admin.activity"></h2>
       <div class="filters">
-        <select id="f-user"><option value="">Alle Benutzer</option></select>
-        <select id="f-action"><option value="">Alle Aktionen</option></select>
-        <label class="toggle"><input type="checkbox" id="f-live" checked> live</label>
-        <button class="btn" id="btn-refresh">Aktualisieren</button>
+        <select id="f-user"><option value="" data-i18n="admin.all_users"></option></select>
+        <select id="f-action"><option value="" data-i18n="admin.all_actions"></option></select>
+        <label class="toggle"><input type="checkbox" id="f-live" checked> <span data-i18n="admin.live"></span></label>
+        <button class="btn" id="btn-refresh" data-i18n="admin.refresh"></button>
       </div>
     </div>
     <div class="table-wrap">
       <table class="data" id="log">
-        <thead><tr><th>Zeit</th><th>Benutzer</th><th>Aktion</th><th>Details</th><th>IP</th></tr></thead>
+        <thead><tr><th data-i18n="admin.col.time"></th><th data-i18n="admin.col.user"></th><th data-i18n="admin.col.action"></th><th data-i18n="admin.col.details"></th><th data-i18n="admin.col.ip"></th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
-    <p class="muted small" id="log-empty" hidden>Keine Einträge.</p>
-    <button class="btn" id="btn-more" hidden>Ältere laden</button>
-    <p class="muted small">Einträge älter als 180 Tage werden beim Start automatisch gelöscht.</p>
+    <p class="muted small" id="log-empty" data-i18n="admin.no_entries" hidden></p>
+    <button class="btn" id="btn-more" data-i18n="admin.more" hidden></button>
+    <p class="muted small" data-i18n="admin.log_hint"></p>
   </section>
 </main>
-<footer class="app-foot"><a href="/static/impressum.html">Impressum</a> · <a href="/static/datenschutz.html">Datenschutz</a></footer>
+<footer class="app-foot"><a href="/static/impressum.html" data-i18n="foot.imprint"></a> · <a href="/static/datenschutz.html" data-i18n="foot.privacy"></a></footer>
 
 <dialog id="user-dialog">
   <form class="dlg" id="user-form">
     <header>
-      <h2 id="user-heading">Neuer Benutzer</h2>
-      <button type="button" class="btn icon" id="user-close" aria-label="Schließen">✕</button>
+      <h2 id="user-heading"></h2>
+      <button type="button" class="btn icon" id="user-close" data-i18n-attr="aria-label:btn.close">✕</button>
     </header>
-    <label id="user-name-label">Name <input name="username" maxlength="64" pattern="[A-Za-z0-9._\-]{2,64}" autocomplete="off" required></label>
-    <label id="user-email-label">E-Mail (optional, für „Passwort vergessen“) <input name="email" type="email" maxlength="254" autocomplete="off"></label>
-    <label id="user-pw-label">Passwort (mindestens 8 Zeichen) <input name="password" type="text" minlength="8" maxlength="256" autocomplete="new-password" required></label>
-    <label class="toggle" id="user-admin-label"><input type="checkbox" name="is_admin"> Admin</label>
+    <label id="user-name-label"><span data-i18n="admin.f.name"></span> <input name="username" maxlength="64" pattern="[A-Za-z0-9._\-]{2,64}" autocomplete="off" data-i18n-attr="title:login.username_rule" required></label>
+    <label id="user-email-label"><span data-i18n="admin.f.email"></span> <input name="email" type="email" maxlength="254" autocomplete="off"></label>
+    <label id="user-pw-label"><span data-i18n="admin.f.pw"></span> <input name="password" type="text" minlength="8" maxlength="256" autocomplete="new-password" required></label>
+    <label class="toggle" id="user-admin-label"><input type="checkbox" name="is_admin"> <span data-i18n="admin.f.admin"></span></label>
     <p class="error" id="user-error" hidden></p>
     <footer>
-      <button type="button" class="btn" id="user-gen">Passwort erzeugen</button>
-      <button type="submit" class="btn primary">Speichern</button>
+      <button type="button" class="btn" id="user-gen" data-i18n="admin.gen_pw"></button>
+      <button type="submit" class="btn primary" data-i18n="btn.save"></button>
     </footer>
   </form>
 </dialog>
@@ -131,12 +130,12 @@
   <form class="dlg" id="ref-form">
     <header>
       <h2 id="ref-heading"></h2>
-      <button type="button" class="btn icon" id="ref-close" aria-label="Schließen">✕</button>
+      <button type="button" class="btn icon" id="ref-close" data-i18n-attr="aria-label:btn.close">✕</button>
     </header>
     <div class="ref-fields" id="ref-fields"></div>
     <p class="error" id="ref-error" hidden></p>
     <footer>
-      <button type="submit" class="btn primary">Speichern</button>
+      <button type="submit" class="btn primary" data-i18n="btn.save"></button>
     </footer>
   </form>
 </dialog>

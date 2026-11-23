@@ -2,12 +2,20 @@
 /* Gemeinsame Helfer für Desktop (app.js) und Smartphone (mobile.js) */
 document.head.append(Object.assign(document.createElement("script"), { src: "/static/foot.js" }));
 
+/* ---------- Sprache (i18n.js): Texte aus texts.json ---------- */
+const t = (key, vars) => i18n.t(key, vars);
+// Erst rendern, wenn die Texte geladen sind (erstes Ereignis „i18n“); danach bei jedem Sprachwechsel neu zeichnen
+const textsReady = new Promise((r) => document.addEventListener("i18n", r, { once: true }));
+const statusText = (status) => t(`status.${status || "offen"}`);
+
 /* ---------- Datums-Helfer (alles in UTC, Strings im Format YYYY-MM-DD) ---------- */
 const MS_DAY = 86400000;
-const MONTHS = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli",
+const monthName = (m) => t(`month.${m}`);
+const wdShort = (i) => t(`wd.${i}`);
+const wdLong = (i) => t(`wdl.${i}`);
+// Fürs Aktivitätsprotokoll (gespeicherte Daten): Monatsnamen immer deutsch
+const MONTHS_DE = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli",
   "August", "September", "Oktober", "November", "Dezember"];
-const WD_SHORT = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
-const WD_LONG = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
 
 const mk = (y, m, d) => new Date(Date.UTC(y, m, d));
 const iso = (dt) => dt.toISOString().slice(0, 10);
@@ -16,8 +24,12 @@ const addDays = (dt, n) => new Date(dt.getTime() + n * MS_DAY);
 const wd = (dt) => (dt.getUTCDay() + 6) % 7;                // Montag = 0
 const mondayOf = (dt) => addDays(dt, -wd(dt));
 const daysBetween = (a, b) => Math.round((b - a) / MS_DAY);
-const fmt = (s) => { const d = parse(s); return `${WD_SHORT[wd(d)]}, ${d.getUTCDate()}.${d.getUTCMonth() + 1}.${d.getUTCFullYear()}`; };
-const fmtShort = (dt) => `${dt.getUTCDate()}.${dt.getUTCMonth() + 1}.`;
+const dateVars = (dt) => ({ d: dt.getUTCDate(), m: dt.getUTCMonth() + 1, y: dt.getUTCFullYear(),
+  mon: t(`mon.${dt.getUTCMonth()}`), wd: wdShort(wd(dt)) });
+const fmt = (s) => t("date.full", dateVars(parse(s)));
+const fmtShort = (dt) => t("date.short", dateVars(dt));
+const fmtShortYear = (dt) => t("date.short_year", dateVars(dt));
+const daysText = (n) => (n === 1 ? t("days.one") : t("days.many", { n }));
 
 function isoWeek(dt) {
   const thu = addDays(dt, 3 - wd(dt));
@@ -34,22 +46,22 @@ function easter(y) {                                       // Gauß/Meeus, grego
   return mk(y, month - 1, day);
 }
 
-// Gesetzliche Feiertage Baden-Württemberg
+// Gesetzliche Feiertage Baden-Württemberg (Namen in der gewählten Sprache)
 function holidays(y) {
   const e = easter(y), map = new Map();
-  const add = (dt, name) => map.set(iso(dt), name);
-  add(mk(y, 0, 1), "Neujahr");
-  add(mk(y, 0, 6), "Heilige Drei Könige");
-  add(addDays(e, -2), "Karfreitag");
-  add(addDays(e, 1), "Ostermontag");
-  add(mk(y, 4, 1), "Tag der Arbeit");
-  add(addDays(e, 39), "Christi Himmelfahrt");
-  add(addDays(e, 50), "Pfingstmontag");
-  add(addDays(e, 60), "Fronleichnam");
-  add(mk(y, 9, 3), "Tag der Deutschen Einheit");
-  add(mk(y, 10, 1), "Allerheiligen");
-  add(mk(y, 11, 25), "1. Weihnachtstag");
-  add(mk(y, 11, 26), "2. Weihnachtstag");
+  const add = (dt, key) => map.set(iso(dt), t(`hol.${key}`));
+  add(mk(y, 0, 1), "newyear");
+  add(mk(y, 0, 6), "epiphany");
+  add(addDays(e, -2), "goodfriday");
+  add(addDays(e, 1), "eastermonday");
+  add(mk(y, 4, 1), "labour");
+  add(addDays(e, 39), "ascension");
+  add(addDays(e, 50), "whitmonday");
+  add(addDays(e, 60), "corpus");
+  add(mk(y, 9, 3), "unity");
+  add(mk(y, 10, 1), "allsaints");
+  add(mk(y, 11, 25), "xmas1");
+  add(mk(y, 11, 26), "xmas2");
   return map;
 }
 
@@ -62,12 +74,12 @@ let guestCfg = null;
 // Hinweis mit Anmelden / Registrieren (Registrieren nur, wenn freigeschaltet)
 function guestHint(text) {
   const box = el("div", "guest-hint");
-  box.append(el("p", null, text || "Melde dich an, um Events als geplant oder gebucht zu markieren, eine Crew zu gründen und zusammen zu planen."));
+  box.append(el("p", null, text || t("guest.hint")));
   const acts = el("div", "guest-acts");
-  const login = el("a", "btn", "Anmelden");
+  const login = el("a", "btn", t("btn.login"));
   login.href = "/login";
   acts.append(login);
-  const reg = el("a", "btn primary", "Kostenlos registrieren");
+  const reg = el("a", "btn primary", t("btn.register"));
   reg.href = "/login#register";
   reg.hidden = !(guestCfg && guestCfg.registration);
   acts.append(reg);
@@ -92,7 +104,21 @@ function track(action, detail = "") {                        // Aktivitätsproto
   fetch("/api/log", { method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action, detail: String(detail).slice(0, 200) }) }).catch(() => {});
 }
-const weekDetail = (mIso) => `KW ${isoWeek(parse(mIso))} (${fmtShort(parse(mIso))}${parse(mIso).getUTCFullYear()})`;
+// Protokoll-Detail (gespeicherte Daten, daher immer deutsch)
+const weekDetail = (mIso) => { const d = parse(mIso); return `KW ${isoWeek(d)} (${d.getUTCDate()}.${d.getUTCMonth() + 1}.${d.getUTCFullYear()})`; };
+
+// Fehlermeldung des Servers: Textschlüssel, Schlüssel mit Platzhaltern oder Liste von Prüffehlern
+function errorText(detail, status) {
+  if (typeof detail === "string") return t(detail);
+  if (detail && typeof detail === "object" && !Array.isArray(detail) && detail.key) return t(detail.key, detail.values);
+  if (Array.isArray(detail)) {
+    return detail.map((x) => {
+      const m = /^Value error, (err\.\w+)$/.exec(x.msg || "");
+      return m ? t(m[1]) : t("err.invalid", { field: (x.loc || []).slice(-1)[0] ?? "" });
+    }).join(", ");
+  }
+  return t("err.http", { status });
+}
 
 async function api(method, url, body) {
   const res = await fetch(url, {
@@ -103,8 +129,7 @@ async function api(method, url, body) {
   if (res.status === 401) { location.href = "/login"; throw new Error("401"); }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const d = data.detail;
-    throw new Error(Array.isArray(d) ? d.map((x) => x.msg).join(", ") : d || `Fehler ${res.status}`);
+    throw new Error(errorText(data.detail, res.status));
   }
   return data;
 }
@@ -114,15 +139,15 @@ const catKey = (ev) => (ev.visibility === "group" ? `g${ev.group_id}` : ev.visib
 const catColor = (visibility, color) => (visibility === "public" ? "var(--c-public)"
   : visibility === "private" ? "var(--c-private)" : `var(--g${color})`);
 const evColor = (ev) => catColor(ev.visibility, ev.group_color);
-const catName = (ev) => (ev.visibility === "public" ? "Öffentlich"
-  : ev.visibility === "private" ? "Privat" : ev.group_name);
+const catName = (ev) => (ev.visibility === "public" ? t("cat.public")
+  : ev.visibility === "private" ? t("cat.private") : ev.group_name);
 const paint = (node, ev) => { node.style.setProperty("--c", evColor(ev)); return node; };
 
 function categories(groups) {
   return [
-    { key: "public", name: "Öffentlich", color: catColor("public") },
+    { key: "public", name: t("cat.public"), color: catColor("public") },
     ...groups.map((g) => ({ key: `g${g.id}`, name: g.name, color: catColor("group", g.color) })),
-    { key: "private", name: "Privat", color: catColor("private") },
+    { key: "private", name: t("cat.private"), color: catColor("private") },
   ];
 }
 
@@ -151,7 +176,7 @@ function buildLegend(container, groups, onChange) {
     const off = catFilter.hidden.has(c.key);
     b.classList.toggle("off", off);
     b.setAttribute("aria-pressed", String(!off));
-    b.title = off ? `${c.name} einblenden` : `${c.name} ausblenden`;
+    b.title = t(off ? "cat.show" : "cat.hide", { name: c.name });
     b.addEventListener("click", () => {
       if (catFilter.hidden.has(c.key)) catFilter.hidden.delete(c.key); else catFilter.hidden.add(c.key);
       saveCatFilter();
@@ -172,11 +197,11 @@ function fillVisibility(select, me, groups, ev) {
     select.append(o);
   };
   const vis = ev ? ev.visibility : null;
-  if (me.is_admin || vis !== "public") add("private", "Privat – nur ich", catColor("private"));
+  if (me.is_admin || vis !== "public") add("private", t("vis.private"), catColor("private"));
   if (me.is_admin || vis === "group") {
-    for (const g of groups) add(`g${g.id}`, `Gruppe: ${g.name}`, catColor("group", g.color));
+    for (const g of groups) add(`g${g.id}`, t("vis.group", { name: g.name }), catColor("group", g.color));
   }
-  if (me.is_admin || (isManager(me) && vis !== "private" && vis !== "group")) add("public", "Öffentlich – alle", catColor("public"));
+  if (me.is_admin || (isManager(me) && vis !== "private" && vis !== "group")) add("public", t("vis.public"), catColor("public"));
   let cur = ev ? catKey(ev) : null;
   if (!cur) { try { cur = localStorage.getItem("kal-vis"); } catch {} }
   if (![...select.options].some((o) => o.value === cur)) cur = select.options[0]?.value || "private";
@@ -202,9 +227,9 @@ function parseCode(s) {
 
 async function copyText(text, btn) {
   try { await navigator.clipboard.writeText(text); }
-  catch { prompt("Zum Kopieren markieren:", text); return; }
+  catch { prompt(t("copy.prompt"), text); return; }
   const old = btn.textContent;
-  btn.textContent = "Kopiert ✓";
+  btn.textContent = t("btn.copied");
   setTimeout(() => { btn.textContent = old; }, 1500);
 }
 
@@ -232,17 +257,17 @@ function buildGroupsPanel(container, groups, onChange) {
   };
 
   container.append(
-    el("h3", null, "Neue Gruppe gründen"),
-    form("Name, z. B. Trackday-Crew", "Gründen", (name) => api("POST", "/api/groups", { name })),
-    el("h3", null, "Einer Gruppe beitreten"),
-    form("Einladungslink oder Code", "Beitreten", async (text) => {
+    el("h3", null, t("groups.new")),
+    form(t("groups.new_ph"), t("groups.create"), (name) => api("POST", "/api/groups", { name })),
+    el("h3", null, t("groups.join_head")),
+    form(t("groups.join_ph"), t("groups.join"), async (text) => {
       const code = parseCode(text);
       const p = await api("GET", `/api/groups/preview?code=${encodeURIComponent(code)}`);
-      if (p.already_member) throw new Error(`Du bist bereits Mitglied von „${p.name}“`);
+      if (p.already_member) throw new Error(t("groups.already", { name: p.name }));
       await api("POST", "/api/groups/join", { code });
     }),
     err,
-    el("h3", null, groups.length ? "Meine Gruppen" : "Du bist noch in keiner Gruppe"),
+    el("h3", null, groups.length ? t("groups.mine") : t("groups.none")),
   );
 
   for (const g of groups) {
@@ -250,22 +275,21 @@ function buildGroupsPanel(container, groups, onChange) {
     card.style.setProperty("--c", catColor("group", g.color));
     const head = el("div", "gp-head");
     head.append(el("i", "gp-dot"), el("strong", null, g.name));
-    if (g.is_owner) head.append(el("span", "gp-badge", "Owner"));
-    head.append(el("span", "muted small gp-count", `${g.events} ${g.events === 1 ? "Event" : "Events"}`));
+    if (g.is_owner) head.append(el("span", "gp-badge", t("groups.owner")));
+    head.append(el("span", "muted small gp-count", g.events === 1 ? t("groups.events_one") : t("groups.events_many", { n: g.events })));
     card.append(head);
 
     const mem = el("div", "gp-members");
     for (const m of g.members) {
       const chip = el("span", "gp-member", m.username + (m.is_owner ? " ★" : ""));
-      chip.title = m.is_owner ? "Owner" : "Mitglied";
+      chip.title = m.is_owner ? t("groups.owner") : t("groups.member");
       const others = g.members.filter((x) => x.is_owner).length;
       if (g.is_owner && (!m.is_owner || others > 1)) {
         const s = el("button", "gp-star", m.is_owner ? "−★" : "+★");
         s.type = "button";
-        s.title = m.is_owner ? `${m.username} das Owner-Recht entziehen` : `${m.username} zum Owner machen`;
+        s.title = t(m.is_owner ? "groups.revoke_title" : "groups.make_title", { name: m.username });
         s.addEventListener("click", () => {
-          const msg = m.is_owner ? `${m.username} das Owner-Recht in „${g.name}“ entziehen?`
-            : `${m.username} zum Owner von „${g.name}“ machen? Owner können Mitglieder verwalten, Events der Gruppe bearbeiten, die Teilnahme festlegen und die Gruppe löschen.`;
+          const msg = t(m.is_owner ? "groups.revoke_confirm" : "groups.make_confirm", { name: m.username, group: g.name });
           if (confirm(msg)) run(() => api("PUT", `/api/groups/${g.id}/members/${m.id}/owner`, { is_owner: !m.is_owner }));
         });
         chip.append(s);
@@ -273,9 +297,9 @@ function buildGroupsPanel(container, groups, onChange) {
       if (g.is_owner && !m.is_owner) {
         const x = el("button", "gp-x", "×");
         x.type = "button";
-        x.title = `${m.username} entfernen`;
+        x.title = t("groups.remove_title", { name: m.username });
         x.addEventListener("click", () => {
-          if (confirm(`${m.username} aus „${g.name}“ entfernen?`)) {
+          if (confirm(t("groups.remove_confirm", { name: m.username, group: g.name }))) {
             run(() => api("DELETE", `/api/groups/${g.id}/members/${m.id}`, {}));
           }
         });
@@ -290,11 +314,11 @@ function buildGroupsPanel(container, groups, onChange) {
     link.readOnly = true;
     link.value = inviteLink(g.invite_code);
     link.addEventListener("focus", () => link.select());
-    const copy = el("button", "btn", "Link kopieren");
+    const copy = el("button", "btn", t("btn.copy_link"));
     copy.type = "button";
     copy.addEventListener("click", () => copyText(link.value, copy));
     inv.append(link, copy);
-    card.append(el("div", "muted small", "Einladung – wer den Link hat, kann beitreten:"), inv);
+    card.append(el("div", "muted small", t("groups.invite")), inv);
 
     const actions = el("div", "gp-actions");
     const act = (label, cls, handler) => {
@@ -304,26 +328,27 @@ function buildGroupsPanel(container, groups, onChange) {
       actions.append(b);
     };
     if (g.is_owner) {
-      act("Umbenennen", "", () => {
-        const name = prompt("Neuer Name der Gruppe:", g.name);
+      act(t("groups.rename"), "", () => {
+        const name = prompt(t("groups.rename_prompt"), g.name);
         if (name && name.trim() && name.trim() !== g.name) run(() => api("PUT", `/api/groups/${g.id}`, { name: name.trim() }));
       });
-      act("Neuer Link", "", () => {
-        if (confirm("Neuen Einladungslink erzeugen? Der bisherige Link funktioniert dann nicht mehr.")) {
+      act(t("groups.new_link"), "", () => {
+        if (confirm(t("groups.new_link_confirm"))) {
           run(() => api("POST", `/api/groups/${g.id}/code`, {}));
         }
       });
     }
-    act("Verlassen", "", () => {
+    act(t("groups.leave"), "", () => {
       const last = g.members.length === 1;
       const msg = last
-        ? `Du bist das letzte Mitglied. „${g.name}“ wird mit allen ${g.events} Events gelöscht. Fortfahren?`
-        : `„${g.name}“ verlassen? Deine Gruppen-Events bleiben in der Gruppe.${g.is_owner && g.members.filter((x) => x.is_owner).length === 1 ? " Das nächste Mitglied wird Owner." : ""}`;
+        ? t("groups.leave_last", { name: g.name, n: g.events })
+        : t("groups.leave_confirm", { name: g.name })
+          + (g.is_owner && g.members.filter((x) => x.is_owner).length === 1 ? t("groups.leave_next_owner") : "");
       if (confirm(msg)) run(() => api("POST", `/api/groups/${g.id}/leave`, {}));
     });
     if (g.is_owner) {
-      act("Gruppe löschen", "danger", () => {
-        if (confirm(`„${g.name}“ mit allen ${g.events} Events für alle Mitglieder löschen?`)) {
+      act(t("groups.delete"), "danger", () => {
+        if (confirm(t("groups.delete_confirm", { name: g.name, n: g.events }))) {
           run(() => api("DELETE", `/api/groups/${g.id}`, {}));
         }
       });
@@ -341,9 +366,9 @@ async function handleJoinHash(onJoined) {
   history.replaceState(null, "", location.pathname);
   try {
     const p = await api("GET", `/api/groups/preview?code=${encodeURIComponent(m[1])}`);
-    if (p.already_member) { alert(`Du bist bereits Mitglied von „${p.name}“.`); return; }
-    const ok = confirm(`Der Gruppe „${p.name}“ (${p.members} ${p.members === 1 ? "Mitglied" : "Mitglieder"}) beitreten?\n\n`
-      + "Du siehst dann die Gruppen-Events, und die Mitglieder sehen deine Einträge dort.");
+    if (p.already_member) { alert(t("groups.already_member", { name: p.name })); return; }
+    const members = p.members === 1 ? t("groups.join_member_one") : t("groups.join_member_many", { n: p.members });
+    const ok = confirm(t("groups.join_confirm", { name: p.name, members }));
     if (!ok) return;
     await api("POST", "/api/groups/join", { code: m[1] });
     await onJoined();
@@ -352,11 +377,12 @@ async function handleJoinHash(onJoined) {
 
 /* ---------- Veranstalter & Rennstrecken (Stammdaten vom Admin) ---------- */
 const refs = { organizers: [], tracks: [] };
+// title, none und Feldbezeichnungen sind Textschlüssel
 const REF_KINDS = {
-  organizer: { list: "organizers", idKey: "organizer_id", nameKey: "organizer_name", title: "Veranstalter", none: "– kein Veranstalter –",
-    fields: [["website", "Website", "url"], ["email", "E-Mail", "mail"], ["phone", "Telefon", "tel"], ["note", "Notiz", "text"]] },
-  track: { list: "tracks", idKey: "track_id", nameKey: "track_name", title: "Rennstrecke", none: "– keine Rennstrecke –",
-    fields: [["location", "Ort", "text"], ["length", "Länge", "text"], ["website", "Website", "url"], ["note", "Notiz", "text"]] },
+  organizer: { list: "organizers", idKey: "organizer_id", nameKey: "organizer_name", title: "ref.organizer", none: "ref.no_organizer",
+    fields: [["website", "ref.website", "url"], ["email", "ref.email", "mail"], ["phone", "ref.phone", "tel"], ["note", "ref.note", "text"]] },
+  track: { list: "tracks", idKey: "track_id", nameKey: "track_name", title: "ref.track", none: "ref.no_track",
+    fields: [["location", "ref.location", "text"], ["length", "ref.length", "text"], ["website", "ref.website", "url"], ["note", "ref.note", "text"]] },
 };
 
 async function loadRefs() {
@@ -366,7 +392,7 @@ async function loadRefs() {
 
 function fillRefSelect(select, kind, currentId) {
   const k = REF_KINDS[kind];
-  select.replaceChildren(new Option(k.none, ""));
+  select.replaceChildren(new Option(t(k.none), ""));
   for (const r of refs[k.list]) select.append(new Option(r.name, r.id));
   select.value = currentId && refs[k.list].some((r) => r.id === currentId) ? String(currentId) : "";
 }
@@ -401,8 +427,8 @@ function refLinks(ev, container) {
     b.type = "button";
     b.dataset.refKind = kind;
     b.dataset.refId = ev[k.idKey];
-    b.title = `${k.title}: Details anzeigen`;
-    row.append(el("span", "ref-label", k.title), b);
+    b.title = t("ref.details", { title: t(k.title) });
+    row.append(el("span", "ref-label", t(k.title)), b);
     container.append(row);
   }
   container.hidden = !container.childElementCount;
@@ -425,9 +451,9 @@ function refFrame(sub, title) {
   const titles = el("div");
   titles.append(el("span", "muted small", sub), el("h2", null, title));
   head.append(titles);
-  const close = el("button", mobile ? "btn m-close" : "btn icon", mobile ? "Schließen" : "✕");
+  const close = el("button", mobile ? "btn m-close" : "btn icon", mobile ? t("btn.close") : "✕");
   close.type = "button";
-  close.setAttribute("aria-label", "Schließen");
+  close.setAttribute("aria-label", t("btn.close"));
   close.addEventListener("click", () => refDialog.close());
   if (!mobile) head.append(close);
   body.append(head);
@@ -444,7 +470,7 @@ function showRef(kind, id) {
   const k = REF_KINDS[kind];
   const r = refs[k.list].find((x) => x.id === id);
   if (!r) return;
-  const f = refFrame(k.title, r.name);
+  const f = refFrame(t(k.title), r.name);
 
   const dl = el("dl", "ref-details");
   for (const [key, label, type] of k.fields) {
@@ -460,12 +486,12 @@ function showRef(kind, id) {
     } else if (type === "tel") {
       const a = el("a", null, v); a.href = `tel:${v.replace(/[^\d+]/g, "")}`; dd.append(a);
     } else dd.textContent = v;
-    dl.append(el("dt", null, label), dd);
+    dl.append(el("dt", null, t(label)), dd);
   }
-  if (!dl.childElementCount) dl.append(el("dd", "muted", "Keine weiteren Angaben hinterlegt."));
+  if (!dl.childElementCount) dl.append(el("dd", "muted", t("ref.no_details")));
   f.body.append(dl);
   if (kind === "organizer" && canEditOrganizer(id)) {
-    const ed = el("button", "btn", "Angaben bearbeiten");
+    const ed = el("button", "btn", t("ref.edit_details"));
     ed.type = "button";
     ed.addEventListener("click", () => editOrganizer(id));
     f.body.append(ed);
@@ -477,16 +503,16 @@ function showRef(kind, id) {
 function editOrganizer(id) {
   const r = refs.organizers.find((x) => x.id === id);
   if (!r) return;
-  const f = refFrame("Veranstalter bearbeiten", r.name);
+  const f = refFrame(t("ref.edit_organizer"), r.name);
   const form = el("form", "ref-edit");
   const max = { website: 300, email: 200, phone: 60, note: 2000 };
   for (const [key, label, type] of REF_KINDS.organizer.fields) {
-    const lab = el("label", null, `${label} `);
+    const lab = el("label", null, `${t(label)} `);
     const inp = el(type === "text" ? "textarea" : "input");
     inp.name = key;
     if (type === "text") inp.rows = 4;
     else inp.type = type === "mail" ? "email" : type === "tel" ? "tel" : "text";
-    if (type === "url") inp.placeholder = "www.beispiel.de";
+    if (type === "url") inp.placeholder = t("ref.url_ph");
     inp.maxLength = max[key];
     inp.value = r[key] || "";
     lab.append(inp);
@@ -495,10 +521,10 @@ function editOrganizer(id) {
   const err = el("p", "error");
   err.hidden = true;
   const acts = el("footer");
-  const back = el("button", "btn", "Zurück");
+  const back = el("button", "btn", t("btn.back"));
   back.type = "button";
   back.addEventListener("click", () => showRef("organizer", id));
-  const save = el("button", "btn primary", "Speichern");
+  const save = el("button", "btn primary", t("btn.save"));
   save.type = "submit";
   acts.append(back, save);
   form.append(err, acts);
@@ -517,7 +543,7 @@ function editOrganizer(id) {
       save.disabled = false;
     }
   });
-  f.body.append(el("p", "muted small", "Den Namen des Veranstalters ändert der Admin."), form);
+  f.body.append(el("p", "muted small", t("ref.name_by_admin")), form);
   refShow(f);
 }
 
@@ -526,15 +552,15 @@ function openMyOrganizers() {
   const ids = managedIds(currentMe());
   const mine = refs.organizers.filter((r) => ids.includes(r.id));
   if (mine.length === 1) { showRef("organizer", mine[0].id); return; }
-  const f = refFrame("Eventmanager", "Meine Veranstalter");
+  const f = refFrame(t("ref.manager"), t("ref.my_organizers"));
   const list = el("div", "feed-list");
-  if (!mine.length) list.append(el("p", "muted", "Dir sind keine Veranstalter zugeordnet."));
+  if (!mine.length) list.append(el("p", "muted", t("ref.no_assigned")));
   for (const r of mine) {
     const row = el("div", "feed-row");
     const txt = el("div", "feed-txt");
-    txt.append(el("strong", null, r.name), el("span", "muted small", r.website || "keine Website hinterlegt"));
+    txt.append(el("strong", null, r.name), el("span", "muted small", r.website || t("ref.no_website")));
     const acts = el("div", "feed-acts");
-    const b = el("button", "btn small", "Bearbeiten");
+    const b = el("button", "btn small", t("btn.edit"));
     b.type = "button";
     b.addEventListener("click", () => editOrganizer(r.id));
     acts.append(b);
@@ -551,13 +577,13 @@ function syncManagerMenu() {
   const show = isManager(me);
   let b = $("my-orgs");
   if (!show) { if (b) b.remove(); return; }
-  if (b) return;
+  if (b) { b.textContent = t("ref.my_organizers"); return; }
   const desktop = $("user-menu"), mobile = $("m-menu");
   if (desktop) {
-    b = el("button", null, "Meine Veranstalter");
+    b = el("button", null, t("ref.my_organizers"));
     desktop.insertBefore(b, $("btn-password"));
   } else if (mobile) {
-    b = el("button", "m-row", "Meine Veranstalter");
+    b = el("button", "m-row", t("ref.my_organizers"));
     mobile.querySelector(".sheet-body").insertBefore(b, $("m-feed"));
     b.addEventListener("click", () => mobile.close());
   } else return;
@@ -590,7 +616,7 @@ function setupPasswordDialog(dialog, openBtn) {
     e.preventDefault();
     err.hidden = true;
     if (form.new_password.value !== form.new_password2.value) {
-      err.textContent = "Die neuen Passwörter stimmen nicht überein";
+      err.textContent = t("err.new_pw_mismatch");
       err.hidden = false;
       return;
     }
@@ -619,15 +645,13 @@ function openFeedDialog(groups) {
   }
   const body = el("div", mobile ? "sheet-body" : "dlg");
   const head = el("header");
-  head.append(el("h2", null, "Kalender-Abo"));
-  const close = el("button", mobile ? "btn m-close" : "btn icon", mobile ? "Schließen" : "✕");
+  head.append(el("h2", null, t("feed.title")));
+  const close = el("button", mobile ? "btn m-close" : "btn icon", mobile ? t("btn.close") : "✕");
   close.type = "button";
-  close.setAttribute("aria-label", "Schließen");
+  close.setAttribute("aria-label", t("btn.close"));
   close.addEventListener("click", () => feedDialog.close());
   if (!mobile) head.append(close);
-  body.append(head, el("p", "muted small",
-    "Abonniere deine Termine im Kalender deines Handys oder Rechners. Änderungen kommen automatisch an "
-    + "(je nach App nach einigen Minuten bis Stunden). Der Link ist geheim – wer ihn hat, sieht deine Termine."));
+  body.append(head, el("p", "muted small", t("feed.intro")));
   const list = el("div", "feed-list");
   const err = el("p", "error");
   err.hidden = true;
@@ -635,32 +659,36 @@ function openFeedDialog(groups) {
 
   const fill = (url) => {
     list.replaceChildren();
+    // Kalender-Apps schicken kein Sprach-Cookie: Englisch steht im Link (ohne Angabe Deutsch)
+    const feedUrl = (params) => {
+      const q = new URLSearchParams(params);
+      if (i18n.lang === "en") q.set("lang", "en");
+      return q.toString() ? `${url}?${q}` : url;
+    };
     const feeds = [
-      ["Meine Termine", "geplant, gebucht, private Termine und alles, woran eine deiner Gruppen teilnimmt", url],
-      ["Alle Termine", "alles, was du bei racingkalender.de siehst", `${url}?umfang=alle`],
-      ...groups.map((g) => [`Gruppe: ${g.name}`, "Termine der Gruppe und alles, woran sie teilnimmt", `${url}?gruppe=${g.id}`]),
+      [t("feed.mine"), t("feed.mine_hint"), feedUrl({})],
+      [t("feed.all"), t("feed.all_hint"), feedUrl({ umfang: "alle" })],
+      ...groups.map((g) => [t("feed.group", { name: g.name }), t("feed.group_hint"), feedUrl({ gruppe: g.id })]),
     ];
     for (const [title, hint, link] of feeds) {
       const row = el("div", "feed-row");
       const txt = el("div", "feed-txt");
       txt.append(el("strong", null, title), el("span", "muted small", hint));
       const acts = el("div", "feed-acts");
-      const sub = el("a", "btn small primary", "Abonnieren");
+      const sub = el("a", "btn small primary", t("feed.subscribe"));
       sub.href = link.replace(/^https?:/, "webcal:");          // öffnet Apple-Kalender / Outlook direkt
-      const copy = el("button", "btn small", "Link kopieren");
+      const copy = el("button", "btn small", t("btn.copy_link"));
       copy.type = "button";
       copy.addEventListener("click", () => copyText(link, copy));
       acts.append(sub, copy);
       row.append(txt, acts);
       list.append(row);
     }
-    list.append(el("p", "muted small",
-      "Google Kalender: „Link kopieren“, dann im Browser unter Weitere Kalender → „Per URL“ einfügen. "
-      + "iPhone, Mac und Outlook: „Abonnieren“ öffnet die Kalender-App direkt."));
-    const renew = el("button", "btn small", "Neuen Link erzeugen");
+    list.append(el("p", "muted small", t("feed.help")));
+    const renew = el("button", "btn small", t("feed.renew"));
     renew.type = "button";
     renew.addEventListener("click", async () => {
-      if (!confirm("Neuen Link erzeugen? Alle bisherigen Abos hören auf zu funktionieren und müssen neu eingerichtet werden.")) return;
+      if (!confirm(t("feed.renew_confirm"))) return;
       try { fill((await api("POST", "/api/feed/renew", {})).url); }
       catch (ex) { err.textContent = ex.message; err.hidden = false; }
     });
@@ -669,7 +697,7 @@ function openFeedDialog(groups) {
 
   if (mobile) body.append(close);
   feedDialog.replaceChildren(body);
-  list.append(el("p", "muted", "Lade …"));
+  list.append(el("p", "muted", t("loading")));
   if (!feedDialog.open) feedDialog.showModal();
   document.activeElement?.blur();
   api("GET", "/api/feed").then((r) => fill(r.url)).catch((ex) => { err.textContent = ex.message; err.hidden = false; });
@@ -680,7 +708,7 @@ function openFeedDialog(groups) {
    (möglich bei öffentlichen Events und bei Events der eigenen Gruppe). */
 const canParticipate = (ev, g) => ev.visibility === "public" || (ev.visibility === "group" && ev.group_id === g.id);
 // Text, wenn keine sichtbaren Teilnehmer: andere sieht man nur, wenn man mit ihnen in einer Gruppe ist
-const noPeopleText = (ev) => (ev.visibility === "public" ? "noch niemand aus deinen Gruppen eingetragen" : "noch niemand eingetragen");
+const noPeopleText = (ev) => t(ev.visibility === "public" ? "ev.nobody_groups" : "ev.nobody");
 const groupNamesIn = (ev, groups) => groups.filter((g) => ev.groups_in.includes(g.id)).map((g) => g.name);
 
 // Anzeige im Event: Owner bekommen ein Häkchen je eigener Gruppe, andere sehen, welche ihrer Gruppen teilnehmen
@@ -698,7 +726,7 @@ function groupParticipation(ev, groups, container, onToggle) {
       cb.addEventListener("change", () => onToggle(g.id, cb.checked));
       item.append(cb);
     } else item.append(el("i", "gp-dot"));
-    item.append(el("span", null, `${g.name} nimmt teil`));
+    item.append(el("span", null, t("ev.takes_part", { name: g.name })));
     container.append(item);
   }
   container.hidden = !container.childElementCount;
@@ -731,14 +759,14 @@ const matchesRefs = (ev) =>
 function buildRefFilter(container, groups, onChange) {
   container.replaceChildren();
   const lists = [
-    ["organizer", "Alle Veranstalter", "Veranstalter", refs.organizers.map((r) => [r.id, r.name])],
-    ["track", "Alle Rennstrecken", "Rennstrecke", refs.tracks.map((r) => [r.id, r.name])],
-    ["group", "Alle Gruppen", "Gruppe nimmt teil", groups.map((g) => [g.id, `${g.name} nimmt teil`])],
+    ["organizer", t("filter.all_organizers"), t("ref.organizer"), refs.organizers.map((r) => [r.id, r.name])],
+    ["track", t("filter.all_tracks"), t("ref.track"), refs.tracks.map((r) => [r.id, r.name])],
+    ["group", t("filter.all_groups"), t("filter.group"), groups.map((g) => [g.id, t("ev.takes_part", { name: g.name })])],
   ];
   for (const [kind, all, title, options] of lists) {
     if (kind === "group" && !groups.length) { refFilter.group = ""; continue; }
     const sel = el("select", "rf-select");
-    sel.setAttribute("aria-label", `Filter ${title}`);
+    sel.setAttribute("aria-label", t("filter.aria", { title }));
     sel.append(new Option(all, ""));
     for (const [id, name] of options) sel.append(new Option(name, String(id)));
     if (!options.some(([id]) => String(id) === refFilter[kind])) refFilter[kind] = "";

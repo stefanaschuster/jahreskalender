@@ -5,6 +5,10 @@
 // an den HTML-Dateien selbst muss nichts geändert werden.
 //
 // Nach Änderungen: kein Server-Neustart nötig, nur Browser-Reload.
+//
+// Zweisprachig: Die Texte der Seiten stehen in texts.json (imprint.*, privacy.*). Felder mit
+// Variante „_en“ werden auf Englisch verwendet. Nach jedem Sprachwechsel (Ereignis „i18n“)
+// werden die Platzhalter neu gefüllt, weil i18n.js die Absätze dabei neu schreibt.
 
 document.head.append(Object.assign(document.createElement("script"), { src: "/static/foot.js" }));
 
@@ -25,18 +29,21 @@ const LEGAL_DATA = {
   // --- Betriebsart ---
   // Wird im Impressum als Zusatz angezeigt.
   betriebsart: "Privat betriebenes, nichtkommerzielles Projekt.",
+  betriebsart_en: "Privately run, non-commercial project.",
 
   // --- Datum der letzten Aktualisierung der Datenschutzerklärung ---
   stand: "November 2026",
+  stand_en: "November 2026",
 };
 
 // Füllt alle Elemente mit data-legal="<key>" mit dem jeweiligen Wert.
 // Elemente mit data-legal-row werden komplett ausgeblendet, wenn der
 // Wert leer ist (z. B. Telefon).
-document.addEventListener("DOMContentLoaded", () => {
+function fillLegal() {
+  const en = window.i18n && i18n.lang === "en";
   document.querySelectorAll("[data-legal]").forEach((el) => {
     const key = el.getAttribute("data-legal");
-    const val = LEGAL_DATA[key];
+    const val = en && LEGAL_DATA[key + "_en"] !== undefined ? LEGAL_DATA[key + "_en"] : LEGAL_DATA[key];
     if (val === undefined) return;
     if (!val && el.hasAttribute("data-legal-row")) {
       el.style.display = "none";
@@ -53,4 +60,6 @@ document.addEventListener("DOMContentLoaded", () => {
     el.setAttribute("href", "mailto:" + LEGAL_DATA.email);
     el.textContent = LEGAL_DATA.email;
   });
-});
+}
+document.addEventListener("DOMContentLoaded", fillLegal);
+document.addEventListener("i18n", fillLegal);

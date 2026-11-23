@@ -10,6 +10,7 @@ code/app.py                        FastAPI-Anwendung (Objekt `app`)
 code/db.py                         SQLite-Schema und Passwort-Hashing
 code/ics.py                        iCalendar lesen/schreiben (Import, Export, Kalender-Abo)
 code/mail.py                       Mailversand über die Brevo-API
+code/texts.py                      Texte für Server-Seite (Fehler, Mails, Kalender-Abo) aus static/texts.json
 code/loesche_events_stammdaten.py  Skript: alle Events, Veranstalter und Strecken löschen
 code/VERSION                       Version (Fußzeile)
 code/requirements.txt              gepinnte Abhängigkeiten
@@ -19,6 +20,11 @@ user.py                            Benutzerverwaltung auf der Kommandozeile
 deploy/                            systemd-Unit und Caddy-Snippet für selbst gehostet
 .env.example                       Konfiguration
 ```
+
+Zweisprachig (Deutsch/Englisch): alle Texte stehen in `code/static/texts.json`, im HTML und JS nur Schlüssel
+(`data-i18n`, `i18n.t()`), auch Fehlermeldungen des Servers. Sprache aus dem Cookie `ir_lang` (Umschalter DE | EN oben rechts),
+sonst aus der Browser-Sprache. Das Kalender-Abo ist auf Englisch, wenn der Link `lang=en` enthält.
+Daten aus der Datenbank (Event-Namen, Notizen, Protokoll) werden nicht übersetzt.
 
 Daten liegen in `$APP_DATA/kalender.db`. Ohne `APP_DATA` (selbst gehostet) ist das `data/kalender.db`.
 

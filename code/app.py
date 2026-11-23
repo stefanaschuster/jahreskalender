@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field, field_validator
 import db
 import ics
 import mail
+from texts import T, lang_of
 
 YEAR = int(os.environ.get("KAL_YEAR", "2027"))
 SESSION_DAYS = 30
@@ -62,6 +63,11 @@ def _init_eventmanager(con) -> None:
     for op in ("INSERT", "UPDATE", "DELETE"):       # Rechte ändern sich → Browser laden neu
         con.execute(f"CREATE TRIGGER IF NOT EXISTS ver_organizer_managers_{op.lower()} AFTER {op} ON organizer_managers "
                     f"BEGIN UPDATE meta SET v = v + 1 WHERE k = 'version'; END")
+
+
+def err(status: int, key: str, **values) -> HTTPException:
+    """Fehlermeldung als Textschlüssel (static/texts.json); die Seite übersetzt sie in die gewählte Sprache."""
+    return HTTPException(status, {"key": key, "values": values} if values else key)
 
 
 @asynccontextmanager
@@ -117,7 +123,7 @@ def _user_from_token(token: Optional[str]) -> Optional[User]:
 def current_user(request: Request) -> User:
     u = _user_from_request(request)
     if not u:
-        raise HTTPException(401, "Nicht angemeldet")
+        raise err(401, "err.not_logged_in")
     return u
 
 
@@ -131,7 +137,7 @@ def viewer(request: Request) -> User:
 
 def admin_user(user: User = Depends(current_user)) -> User:
     if not user.is_admin:
-        raise HTTPException(403, "Nur für Admins")
+        raise err(403, "err.admin_only")
     return user
 
 
@@ -150,7 +156,7 @@ def log(request: Request, user: Optional[User], action: str, detail: str = "", u
 def _require_json(request: Request) -> None:
     # CSRF-Schutz: Formular-POSTs fremder Seiten können kein application/json senden
     if not request.headers.get("content-type", "").startswith("application/json"):
-        raise HTTPException(415, "JSON erwartet")
+        raise err(415, "err.json_expected")
 
 
 _fails: dict[str, list[float]] = defaultdict(list)
@@ -169,7 +175,7 @@ def login(data: LoginIn, request: Request, response: Response):
     _fails[ip] = [t for t in _fails[ip] if now - t < WINDOW]
     if len(_fails[ip]) >= MAX_FAILS:
         log(request, None, "login_gesperrt", username=data.username.strip())
-        raise HTTPException(429, "Zu viele Fehlversuche, bitte später erneut versuchen")
+        raise err(429, "err.too_many_fails")
 
     name = data.username.strip()
     with db.connect() as con:
@@ -179,7 +185,7 @@ def login(data: LoginIn, request: Request, response: Response):
         if not ok:
             _fails[ip].append(now)
             log(request, None, "login_fehlgeschlagen", username=name)
-            raise HTTPException(401, "Benutzername oder Passwort falsch")
+            raise err(401, "err.bad_login")
         token = _start_session(con, row["id"], request, response)
     _fails.pop(ip, None)
     log(request, _user_from_token(token), "login", request.headers.get("user-agent", "")[:200])
@@ -225,12 +231,12 @@ class OwnPasswordIn(BaseModel):
 def change_password(data: OwnPasswordIn, request: Request, user: User = Depends(current_user)):
     """Eigenes Passwort ändern. Andere Sitzungen werden beendet, die aktuelle bleibt."""
     if len(data.new_password) < MIN_PW:
-        raise HTTPException(400, f"Neues Passwort muss mindestens {MIN_PW} Zeichen haben")
+        raise err(400, "err.new_pw_short", n=MIN_PW)
     with db.connect() as con:
         row = con.execute("SELECT pw_hash FROM users WHERE id = ?", (user.id,)).fetchone()
         if not db.verify_password(data.old_password, row["pw_hash"]):
             log(request, user, "passwort_fehlgeschlagen")
-            raise HTTPException(400, "Bisheriges Passwort ist falsch")
+            raise err(400, "err.old_pw_wrong")
         con.execute("UPDATE users SET pw_hash = ? WHERE id = ?", (db.hash_password(data.new_password), user.id))
         con.execute("DELETE FROM sessions WHERE user_id = ? AND token != ?", (user.id, request.cookies.get(COOKIE)))
     log(request, user, "passwort_geaendert")
@@ -247,7 +253,7 @@ def _mail_limit(request: Request) -> None:
     ip, now = _ip(request), time.time()
     _mail_hits[ip] = [t for t in _mail_hits[ip] if now - t < 3600]
     if len(_mail_hits[ip]) >= MAIL_PER_HOUR:
-        raise HTTPException(429, "Zu viele Anfragen, bitte später erneut versuchen")
+        raise err(429, "err.too_many_requests")
     _mail_hits[ip].append(now)
 
 
@@ -267,16 +273,19 @@ def _base_url(request: Request) -> str:
 def _clean_email(v: str) -> str:
     v = v.strip().lower()
     if len(v) > 254 or not EMAIL_RE.match(v):
-        raise HTTPException(400, "Bitte eine gültige E-Mail-Adresse angeben")
+        raise err(400, "err.email_invalid")
     return v
 
 
-def _send_or_502(request: Request, to: str, subject: str, text: str, link: str, label: str) -> None:
+def _send_or_502(request: Request, to: str, kind: str, link: str, **values) -> None:
+    """Mail an den Nutzer in dessen Sprache; Texte mail.<kind>.subject/.text/.button aus texts.json."""
+    lang = lang_of(request)
     try:
-        mail.send(to, subject, text, link, label)
+        mail.send(to, T(lang, f"mail.{kind}.subject"), T(lang, f"mail.{kind}.text", **values), link,
+                  T(lang, f"mail.{kind}.button"), lang)
     except mail.MailError as ex:
         log(request, None, "mail_fehler", str(ex)[:300])
-        raise HTTPException(502, "Die Mail konnte gerade nicht verschickt werden. Bitte später erneut versuchen.")
+        raise err(502, "err.mail_failed")
 
 
 def _admin_addresses(con) -> list[str]:
@@ -302,26 +311,23 @@ class RegisterIn(BaseModel):
 @app.post("/api/register", dependencies=[Depends(_require_json)])
 def register(data: RegisterIn, request: Request):
     if not public_config()["registration"]:
-        raise HTTPException(503, "Registrierung ist derzeit nicht möglich")
+        raise err(503, "err.registration_closed")
     name = data.username.strip()
     if not NAME_RE.match(name):
-        raise HTTPException(400, "Benutzername: 2–64 Zeichen, erlaubt sind A–Z, a–z, 0–9, Punkt, Unterstrich, Bindestrich")
+        raise err(400, "err.username_rule")
     if len(data.password) < MIN_PW:
-        raise HTTPException(400, f"Passwort muss mindestens {MIN_PW} Zeichen haben")
+        raise err(400, "err.pw_short", n=MIN_PW)
     email = _clean_email(data.email)
     with db.connect() as con:
         if con.execute("SELECT 1 FROM users WHERE username = ?", (name,)).fetchone():
-            raise HTTPException(409, f"Der Benutzername „{name}“ ist schon vergeben")
+            raise err(409, "err.username_taken", name=name)
     _mail_limit(request)
     base = _base_url(request)
     with db.connect() as con:
         taken = con.execute("SELECT username FROM users WHERE email = ?", (email,)).fetchone()
     if taken:
         # Nicht verraten, dass die Adresse schon registriert ist – stattdessen Hinweis an die Adresse selbst
-        _send_or_502(request, email, "Du hast schon ein Konto bei racingkalender.de",
-                     f"Jemand wollte mit dieser Adresse ein neues Konto anlegen. Du hast aber schon eines "
-                     f"(Benutzername: {taken['username']}).\n\nPasswort vergessen? Über den Link kannst du ein neues setzen.",
-                     f"{base}/login#forgot", "Zur Anmeldung")
+        _send_or_502(request, email, "exists", f"{base}/login#forgot", username=taken["username"])
         log(request, None, "registrierung_angefragt", username=name)
         return {"ok": True}
     token = secrets.token_urlsafe(32)
@@ -331,10 +337,7 @@ def register(data: RegisterIn, request: Request):
                     "VALUES (?, ?, ?, ?, datetime('now', ?))",
                     (_token_hash(token), name, email, db.hash_password(data.password), f"+{REGISTER_HOURS} hours"))
     try:
-        _send_or_502(request, email, "Bitte bestätige deine Anmeldung bei racingkalender.de",
-                     f"Hallo {name},\n\nbitte bestätige deine E-Mail-Adresse, dann ist dein Konto aktiv. "
-                     f"Der Link gilt {REGISTER_HOURS} Stunden.\n\nWenn du dich nicht angemeldet hast, ignoriere diese Mail einfach.",
-                     f"{base}/login#confirm={token}", "Anmeldung bestätigen")
+        _send_or_502(request, email, "confirm", f"{base}/login#confirm={token}", name=name, hours=REGISTER_HOURS)
     except HTTPException:
         with db.connect() as con:
             con.execute("DELETE FROM registrations WHERE token_hash = ?", (_token_hash(token),))
@@ -353,12 +356,12 @@ def confirm_registration(data: TokenIn, request: Request, response: Response):
         reg = con.execute("SELECT * FROM registrations WHERE token_hash = ? AND expires_at > datetime('now')",
                           (_token_hash(data.token),)).fetchone()
         if not reg:
-            raise HTTPException(404, "Der Bestätigungslink ist ungültig oder abgelaufen. Bitte registriere dich erneut.")
+            raise err(404, "err.confirm_invalid")
         con.execute("DELETE FROM registrations WHERE token_hash = ?", (reg["token_hash"],))
         if con.execute("SELECT 1 FROM users WHERE username = ?", (reg["username"],)).fetchone():
-            raise HTTPException(409, f"Der Benutzername „{reg['username']}“ wurde inzwischen vergeben. Bitte registriere dich neu.")
+            raise err(409, "err.username_taken_meanwhile", name=reg["username"])
         if con.execute("SELECT 1 FROM users WHERE email = ?", (reg["email"],)).fetchone():
-            raise HTTPException(409, "Mit dieser Adresse gibt es schon ein Konto. Bitte melde dich an.")
+            raise err(409, "err.email_has_account")
         cur = con.execute("INSERT INTO users (username, pw_hash, is_admin, email) VALUES (?, ?, 0, ?)",
                           (reg["username"], reg["pw_hash"], reg["email"]))
         uid = cur.lastrowid
@@ -366,11 +369,11 @@ def confirm_registration(data: TokenIn, request: Request, response: Response):
         admins = _admin_addresses(con)
     user = User(id=uid, username=reg["username"], is_admin=False)
     log(request, user, "registriert")
-    for to in admins:                                    # Info an den Admin; Fehler hier sind egal
+    for to in admins:                                    # Info an den Admin (auf Deutsch); Fehler hier sind egal
         try:
-            mail.send(to, f"Neuer Benutzer bei racingkalender.de: {user.username}",
-                      f"{user.username} hat sich registriert und die E-Mail-Adresse bestätigt.",
-                      f"{_base_url(request)}/admin", "Zur Benutzerverwaltung")
+            mail.send(to, T("de", "mail.newuser.subject", name=user.username),
+                      T("de", "mail.newuser.text", name=user.username),
+                      f"{_base_url(request)}/admin", T("de", "mail.newuser.button"), "de")
         except mail.MailError as ex:
             log(request, None, "mail_fehler", str(ex)[:300])
     return {"ok": True}
@@ -384,7 +387,7 @@ class ForgotIn(BaseModel):
 def forgot_password(data: ForgotIn, request: Request):
     """Antwortet immer gleich – verrät nicht, ob es Benutzer oder Adresse gibt."""
     if not mail.configured():
-        raise HTTPException(503, "Passwort-Zurücksetzen per Mail ist nicht eingerichtet – bitte an den Admin wenden")
+        raise err(503, "err.reset_not_configured")
     _mail_limit(request)
     key = data.login.strip()
     with db.connect() as con:
@@ -397,11 +400,8 @@ def forgot_password(data: ForgotIn, request: Request):
         con.execute("DELETE FROM pw_resets WHERE user_id = ? OR expires_at <= datetime('now')", (u["id"],))
         con.execute("INSERT INTO pw_resets (token_hash, user_id, expires_at) VALUES (?, ?, datetime('now', ?))",
                     (_token_hash(token), u["id"], f"+{RESET_HOURS} hours"))
-    _send_or_502(request, u["email"], "Neues Passwort für racingkalender.de",
-                 f"Hallo {u['username']},\n\nüber den Link kannst du ein neues Passwort setzen. "
-                 f"Er gilt {RESET_HOURS} Stunde und nur einmal.\n\nWenn du das nicht angefordert hast, ignoriere diese Mail – "
-                 f"dein bisheriges Passwort bleibt gültig.",
-                 f"{_base_url(request)}/login#reset={token}", "Neues Passwort setzen")
+    _send_or_502(request, u["email"], "reset", f"{_base_url(request)}/login#reset={token}",
+                 name=u["username"], hours=RESET_HOURS)
     log(request, User(id=u["id"], username=u["username"], is_admin=False), "passwort_vergessen")
     return {"ok": True}
 
@@ -414,12 +414,12 @@ class ResetIn(BaseModel):
 @app.post("/api/password/reset", dependencies=[Depends(_require_json)])
 def reset_password(data: ResetIn, request: Request, response: Response):
     if len(data.password) < MIN_PW:
-        raise HTTPException(400, f"Passwort muss mindestens {MIN_PW} Zeichen haben")
+        raise err(400, "err.pw_short", n=MIN_PW)
     with db.connect() as con:
         r = con.execute("SELECT p.user_id, u.username, u.is_admin FROM pw_resets p JOIN users u ON u.id = p.user_id "
                         "WHERE p.token_hash = ? AND p.expires_at > datetime('now')", (_token_hash(data.token),)).fetchone()
         if not r:
-            raise HTTPException(404, "Der Link ist ungültig oder abgelaufen. Bitte fordere einen neuen an.")
+            raise err(404, "err.reset_invalid")
         con.execute("UPDATE users SET pw_hash = ? WHERE id = ?", (db.hash_password(data.password), r["user_id"]))
         con.execute("DELETE FROM pw_resets WHERE user_id = ?", (r["user_id"],))
         con.execute("DELETE FROM sessions WHERE user_id = ?", (r["user_id"],))
@@ -485,7 +485,7 @@ class EventIn(BaseModel):
     def _order(cls, v: dt.date, info):
         start = info.data.get("start_date")
         if start and v < start:
-            raise ValueError("Ende liegt vor dem Beginn")
+            raise ValueError("err.end_before_start")
         return v
 
 
@@ -499,13 +499,13 @@ def _check_target(con, data: EventIn, user: User) -> Optional[int]:
         if user.is_admin:
             return None
         if not user.managed:
-            raise HTTPException(403, "Öffentliche Events kann nur ein Admin anlegen")
+            raise err(403, "err.public_admin_only")
         if not data.organizer_id or data.organizer_id not in user.managed:
-            raise HTTPException(403, "Als Eventmanager bitte einen deiner Veranstalter auswählen")
+            raise err(403, "err.manager_pick_organizer")
         return None
     if data.visibility == "group":
         if not data.group_id or not _is_member(con, data.group_id, user.id):
-            raise HTTPException(403, "Du bist nicht Mitglied dieser Gruppe")
+            raise err(403, "err.not_group_member")
         return data.group_id
     return None
 
@@ -513,9 +513,9 @@ def _check_target(con, data: EventIn, user: User) -> Optional[int]:
 def _check_refs(con, data: EventIn) -> None:
     """Veranstalter und Rennstrecke müssen in den Stammdaten existieren (oder leer sein)."""
     if data.organizer_id and not con.execute("SELECT 1 FROM organizers WHERE id = ?", (data.organizer_id,)).fetchone():
-        raise HTTPException(400, "Veranstalter nicht gefunden")
+        raise err(400, "err.organizer_not_found")
     if data.track_id and not con.execute("SELECT 1 FROM tracks WHERE id = ?", (data.track_id,)).fetchone():
-        raise HTTPException(400, "Rennstrecke nicht gefunden")
+        raise err(400, "err.track_not_found")
 
 
 def _load_events(con, user: User, event_id: Optional[int] = None) -> list[dict]:
@@ -574,7 +574,7 @@ def _visible_event(con, event_id: int, user: User):
     row = con.execute(f"SELECT e.* FROM events e WHERE e.id = :id AND {VISIBLE}",
                       {"id": event_id, "uid": user.id}).fetchone()
     if not row:
-        raise HTTPException(404, "Event nicht gefunden")
+        raise err(404, "err.event_not_found")
     return row
 
 
@@ -582,7 +582,7 @@ def _check_edit(con, event_id: int, user: User):
     row = _visible_event(con, event_id, user)
     ev = _load_events(con, user, event_id)[0]
     if not ev["can_edit"]:
-        raise HTTPException(403, "Dieses Event darfst du nicht ändern")
+        raise err(403, "err.event_no_edit")
     return row
 
 
@@ -603,7 +603,7 @@ def create_event(data: EventIn, request: Request, user: User = Depends(current_u
     # Jeder angemeldete Benutzer: private Termine (nur für ihn sichtbar).
     # Öffentlich: Admin oder Eventmanager des Veranstalters. Gruppen-Events: nur Admin.
     if not user.is_admin and data.visibility == "group":
-        raise HTTPException(403, "Gruppen-Events kann nur ein Admin anlegen")
+        raise err(403, "err.group_events_admin_only")
     with db.connect() as con:
         gid = _check_target(con, data, user)
         _check_refs(con, data)
@@ -622,9 +622,9 @@ def update_event(event_id: int, data: EventIn, request: Request, user: User = De
     with db.connect() as con:
         old = _check_edit(con, event_id, user)
         if old["visibility"] == "public" and data.visibility != "public" and not user.is_admin:
-            raise HTTPException(403, "Öffentliche Events bleiben öffentlich – nur ein Admin kann das ändern")
+            raise err(403, "err.public_stays_public")
         if old["visibility"] == "private" and data.visibility != "private" and not user.is_admin:
-            raise HTTPException(403, "Private Termine bleiben privat")
+            raise err(403, "err.private_stays_private")
         gid = _check_target(con, data, user)
         _check_refs(con, data)
         # Wird ein Event privat, gehört es danach dem, der es privat gemacht hat
@@ -678,7 +678,7 @@ def set_group_participation(event_id: int, group_id: int, data: ParticipationIn,
         _group(con, group_id, user, owner=True)
         row = _visible_event(con, event_id, user)
         if row["visibility"] == "private" or (row["visibility"] == "group" and row["group_id"] != group_id):
-            raise HTTPException(400, "Teilnahme nur an öffentlichen Events oder Events der eigenen Gruppe")
+            raise err(400, "err.participation_rule")
         if data.participates:
             con.execute("INSERT OR IGNORE INTO group_events (group_id, event_id) VALUES (?, ?)", (group_id, event_id))
         else:
@@ -698,7 +698,7 @@ class GroupIn(BaseModel):
     def _strip(cls, v: str) -> str:
         v = v.strip()
         if not v:
-            raise ValueError("Name fehlt")
+            raise ValueError("err.name_missing")
         return v
 
 
@@ -713,9 +713,9 @@ def _new_code() -> str:
 def _group(con, group_id: int, user: User, owner: bool = False):
     g = con.execute("SELECT * FROM groups_ WHERE id = ?", (group_id,)).fetchone()
     if not g or not _is_member(con, group_id, user.id):
-        raise HTTPException(404, "Gruppe nicht gefunden")
+        raise err(404, "err.group_not_found")
     if owner and not _is_owner(con, group_id, user.id):
-        raise HTTPException(403, "Nur Owner der Gruppe dürfen das")
+        raise err(403, "err.owner_only")
     return g
 
 
@@ -781,7 +781,7 @@ def create_group(data: GroupIn, request: Request, user: User = Depends(current_u
     with db.connect() as con:
         n = con.execute("SELECT COUNT(*) FROM group_members WHERE user_id = ?", (user.id,)).fetchone()[0]
         if n >= MAX_GROUPS_PER_USER:
-            raise HTTPException(400, f"Höchstens {MAX_GROUPS_PER_USER} Gruppen pro Benutzer")
+            raise err(400, "err.max_groups", n=MAX_GROUPS_PER_USER)
         cur = con.execute("INSERT INTO groups_ (name, color, invite_code, owner_id) VALUES (?, ?, ?, ?)",
                           (data.name, _pick_color(con, user.id), _new_code(), user.id))
         con.execute("INSERT INTO group_members (group_id, user_id, is_owner) VALUES (?, ?, 1)", (cur.lastrowid, user.id))
@@ -792,12 +792,12 @@ def create_group(data: GroupIn, request: Request, user: User = Depends(current_u
 @app.get("/api/groups/preview")
 def preview_group(code: str, user: User = Depends(current_user)):
     if not CODE_RE.match(code):
-        raise HTTPException(404, "Einladung ungültig oder abgelaufen")
+        raise err(404, "err.invite_invalid")
     with db.connect() as con:
         g = con.execute("SELECT id, name, (SELECT COUNT(*) FROM group_members m WHERE m.group_id = g.id) AS members "
                         "FROM groups_ g WHERE invite_code = ?", (code,)).fetchone()
         if not g:
-            raise HTTPException(404, "Einladung ungültig oder abgelaufen")
+            raise err(404, "err.invite_invalid")
         return {"id": g["id"], "name": g["name"], "members": g["members"],
                 "already_member": _is_member(con, g["id"], user.id)}
 
@@ -809,11 +809,11 @@ def join_group(data: JoinIn, request: Request, user: User = Depends(current_user
         g = con.execute("SELECT id FROM groups_ WHERE invite_code = ?", (code,)).fetchone() if CODE_RE.match(code) else None
         if not g:
             log(request, user, "gruppe_beitritt_fehlgeschlagen")
-            raise HTTPException(404, "Einladung ungültig oder abgelaufen")
+            raise err(404, "err.invite_invalid")
         if not _is_member(con, g["id"], user.id):
             n = con.execute("SELECT COUNT(*) FROM group_members WHERE user_id = ?", (user.id,)).fetchone()[0]
             if n >= MAX_GROUPS_PER_USER:
-                raise HTTPException(400, f"Höchstens {MAX_GROUPS_PER_USER} Gruppen pro Benutzer")
+                raise err(400, "err.max_groups", n=MAX_GROUPS_PER_USER)
             con.execute("INSERT INTO group_members (group_id, user_id) VALUES (?, ?)", (g["id"], user.id))
     log(request, user, "gruppe_beigetreten", f"#{g['id']}")
     return {"id": g["id"]}
@@ -850,13 +850,13 @@ def leave_group(group_id: int, request: Request, user: User = Depends(current_us
 @app.delete("/api/groups/{group_id}/members/{member_id}", dependencies=[Depends(_require_json)])
 def remove_member(group_id: int, member_id: int, request: Request, user: User = Depends(current_user)):
     if member_id == user.id:
-        raise HTTPException(400, "Zum Austreten „Verlassen“ verwenden")
+        raise err(400, "err.use_leave")
     with db.connect() as con:
         _group(con, group_id, user, owner=True)
         if not _is_member(con, group_id, member_id):
-            raise HTTPException(404, "Mitglied nicht gefunden")
+            raise err(404, "err.member_not_found")
         if _is_owner(con, group_id, member_id):
-            raise HTTPException(400, "Owner können nicht entfernt werden – erst das Owner-Recht entziehen")
+            raise err(400, "err.owner_not_removable")
         _leave(con, group_id, member_id)
     log(request, user, "gruppe_mitglied_entfernt", f"#{group_id}")
     return {"ok": True}
@@ -872,11 +872,11 @@ def set_group_owner(group_id: int, member_id: int, data: OwnerIn, request: Reque
     with db.connect() as con:
         _group(con, group_id, user, owner=True)
         if not _is_member(con, group_id, member_id):
-            raise HTTPException(404, "Mitglied nicht gefunden")
+            raise err(404, "err.member_not_found")
         if not data.is_owner:
             n = con.execute("SELECT COUNT(*) FROM group_members WHERE group_id = ? AND is_owner = 1", (group_id,)).fetchone()[0]
             if n <= 1 and _is_owner(con, group_id, member_id):
-                raise HTTPException(400, "Eine Gruppe braucht mindestens einen Owner")
+                raise err(400, "err.need_owner")
         con.execute("UPDATE group_members SET is_owner = ? WHERE group_id = ? AND user_id = ?",
                     (int(data.is_owner), group_id, member_id))
     log(request, user, "gruppe_owner", f"#{group_id}: Mitglied #{member_id} {'ist Owner' if data.is_owner else 'kein Owner mehr'}")
@@ -925,15 +925,17 @@ def feed_renew(request: Request, user: User = Depends(current_user)):
 
 
 @app.get("/ical/{token}.ics")
-def ical_feed(token: str, request: Request, umfang: str = "meine", gruppe: Optional[int] = None):
+def ical_feed(token: str, request: Request, umfang: str = "meine", gruppe: Optional[int] = None, lang: str = "de"):
     """umfang=meine: eigene Markierungen, eigene private Events und Events, an denen eine eigene Gruppe teilnimmt.
-    umfang=alle: alles, was der Benutzer sieht. gruppe=ID: Events der Gruppe und Events, an denen sie teilnimmt."""
+    umfang=alle: alles, was der Benutzer sieht. gruppe=ID: Events der Gruppe und Events, an denen sie teilnimmt.
+    lang=en: Texte auf Englisch (Kalender-Apps schicken kein Sprach-Cookie; ohne Angabe Deutsch wie bisher)."""
+    lang = lang if lang in ("de", "en") else "de"
     if not FEED_RE.match(token):
-        raise HTTPException(404, "Unbekannter Kalender")
+        raise err(404, "err.unknown_calendar")
     with db.connect() as con:
         row = con.execute("SELECT id, username, is_admin FROM users WHERE feed_token = ?", (token,)).fetchone()
         if not row:
-            raise HTTPException(404, "Unbekannter Kalender")
+            raise err(404, "err.unknown_calendar")
         user = User(id=row["id"], username=row["username"], is_admin=bool(row["is_admin"]))
         events = _load_events(con, user)
         groups = {g["id"]: g["name"] for g in con.execute(
@@ -943,34 +945,35 @@ def ical_feed(token: str, request: Request, umfang: str = "meine", gruppe: Optio
             "WHERE e.end_date >= ? AND e.start_date <= ?", (f"{YEAR}-01-01", f"{YEAR}-12-31"))}
     if gruppe is not None:
         if gruppe not in groups:
-            raise HTTPException(404, "Gruppe nicht gefunden")
+            raise err(404, "err.group_not_found")
         events = [e for e in events if gruppe in e["groups_in"] or e["group_id"] == gruppe]
-        name = f"racingkalender.de – {groups[gruppe]}"
+        name = T(lang, "feed.name.group", name=groups[gruppe])
     elif umfang == "alle":
-        name = "racingkalender.de – alle Termine"
+        name = T(lang, "feed.name.all")
     else:
         events = [e for e in events if e["my_status"] or e["groups_in"] or e["visibility"] == "private"]
-        name = "racingkalender.de – meine Termine"
+        name = T(lang, "feed.name.mine")
     base = _base_url(request)
     out = []
     for e in events:
         status = e["my_status"]
+        status_text = T(lang, f"status.{status}") if status else ""
         lines = []
         if status:
-            lines.append(f"Mein Status: {status}")
+            lines.append(T(lang, "feed.line.status", status=status_text))
         if e["organizer_name"]:
-            lines.append(f"Veranstalter: {e['organizer_name']}")
+            lines.append(T(lang, "feed.line.organizer", name=e["organizer_name"]))
         if e["track_name"]:
-            lines.append(f"Rennstrecke: {e['track_name']}")
+            lines.append(T(lang, "feed.line.track", name=e["track_name"]))
         teil = [groups[g] for g in e["groups_in"] if g in groups]
         if teil:
-            lines.append(f"Gruppe nimmt teil: {', '.join(teil)}")
+            lines.append(T(lang, "feed.line.groups", names=", ".join(teil)))
         if e["note"]:
             lines.append("")
             lines.append(e["note"])
         m = meta.get(e["id"])
         out.append({"uid": (m["ics_uid"] if m and m["ics_uid"] else f"jahresplaner-{e['id']}@jahresplaner"),
-                    "title": (f"[{status}] " if status else "") + e["title"],
+                    "title": (f"[{status_text}] " if status else "") + e["title"],
                     "start_date": e["start_date"], "end_date": e["end_date"], "note": "\n".join(lines).strip(),
                     "location": ", ".join(x for x in (e["track_name"], m["location"] if m else "") if x),
                     "status": _STATUS_ICS.get(status, ""), "url": f"{base}/"})
@@ -1062,7 +1065,7 @@ def _ref_save(table: str, ref_id: Optional[int], payload: dict, request: Request
     with db.connect() as con:
         dup = con.execute(f"SELECT id FROM {table} WHERE name = ? AND id IS NOT ?", (data["name"], ref_id)).fetchone()
         if dup:
-            raise HTTPException(409, f"„{data['name']}“ gibt es schon")
+            raise err(409, "err.exists", name=data["name"])
         if ref_id is None:
             cur = con.execute(f"INSERT INTO {table} ({', '.join(cols)}) VALUES ({', '.join('?' * len(cols))})",
                               [data[c] for c in cols])
@@ -1070,7 +1073,7 @@ def _ref_save(table: str, ref_id: Optional[int], payload: dict, request: Request
             action = f"{label}_angelegt"
         else:
             if not con.execute(f"SELECT 1 FROM {table} WHERE id = ?", (ref_id,)).fetchone():
-                raise HTTPException(404, "Nicht gefunden")
+                raise err(404, "err.not_found")
             con.execute(f"UPDATE {table} SET {', '.join(c + ' = ?' for c in cols)} WHERE id = ?",
                         [data[c] for c in cols] + [ref_id])
             action = f"{label}_geaendert"
@@ -1083,7 +1086,7 @@ def _ref_delete(table: str, ref_id: int, request: Request, admin: User):
     with db.connect() as con:
         row = con.execute(f"SELECT name FROM {table} WHERE id = ?", (ref_id,)).fetchone()
         if not row:
-            raise HTTPException(404, "Nicht gefunden")
+            raise err(404, "err.not_found")
         con.execute(f"DELETE FROM {table} WHERE id = ?", (ref_id,))      # Events behalten, Feld wird leer
     log(request, admin, f"{label}_geloescht", row["name"])
     return {"ok": True}
@@ -1093,11 +1096,11 @@ def _ref_delete(table: str, ref_id: int, request: Request, admin: User):
 def manager_edit_organizer(ref_id: int, data: OrganizerDetailsIn, request: Request, user: User = Depends(current_user)):
     """Eventmanager (und Admins) pflegen Website, E-Mail, Telefon und Notiz ihres Veranstalters."""
     if not user.is_admin and ref_id not in user.managed:
-        raise HTTPException(403, "Diesen Veranstalter darfst du nicht bearbeiten")
+        raise err(403, "err.organizer_no_edit")
     with db.connect() as con:
         row = con.execute("SELECT name FROM organizers WHERE id = ?", (ref_id,)).fetchone()
     if not row:
-        raise HTTPException(404, "Veranstalter nicht gefunden")
+        raise err(404, "err.organizer_not_found")
     return _ref_save("organizers", ref_id, {**data.model_dump(), "name": row["name"]}, request, user)
 
 
@@ -1149,7 +1152,7 @@ def export_ics(request: Request, admin: User = Depends(admin_user)):
                "location": ", ".join(x for x in (r["track"], r["track_location"]) if x),
                "organizer": r["organizer"] or "", "track": r["track"] or ""} for r in rows]
     log(request, admin, "ics_export", f"{len(events)} Events")
-    return Response(ics.build(events, "racingkalender.de – öffentliche Events"), media_type="text/calendar; charset=utf-8",
+    return Response(ics.build(events, T(lang_of(request), "feed.name.public")), media_type="text/calendar; charset=utf-8",
                     headers={"Content-Disposition": f'attachment; filename="racingkalender-{dt.date.today()}.ics"',
                              "Cache-Control": "no-store"})
 
@@ -1159,7 +1162,7 @@ class IcsIn(BaseModel):
     create_refs: bool = False              # unbekannte Veranstalter/Strecken als Stammdaten anlegen
 
 
-def _ref_id(con, table: str, name: str, create: bool, created: list, location: str = "") -> Optional[int]:
+def _ref_id(con, table: str, name: str, create: bool, created: list, location: str = "", lang: str = "de") -> Optional[int]:
     name = (name or "").strip()[:100]
     if not name:
         return None
@@ -1172,7 +1175,7 @@ def _ref_id(con, table: str, name: str, create: bool, created: list, location: s
         cur = con.execute("INSERT INTO tracks (name, location) VALUES (?, ?)", (name, location[:200]))
     else:
         cur = con.execute(f"INSERT INTO {table} (name) VALUES (?)", (name,))
-    created.append(f"{'Rennstrecke' if table == 'tracks' else 'Veranstalter'} „{name}“")
+    created.append(T(lang, "import.ref.track" if table == "tracks" else "import.ref.organizer", name=name))
     return cur.lastrowid
 
 
@@ -1204,15 +1207,17 @@ def _ref_in_text(keys: list[tuple[str, int]], text: str) -> Optional[int]:
 def import_ics(data: IcsIn, request: Request, admin: User = Depends(admin_user)):
     """Importiert VEVENTs als öffentliche Events. Gleiche UID → bestehendes Event wird aktualisiert."""
     if "BEGIN:VCALENDAR" not in data.ics.upper():
-        raise HTTPException(400, "Keine ICS-Datei (BEGIN:VCALENDAR fehlt)")
+        raise err(400, "err.not_ics")
     items = ics.parse(data.ics)
+    lang = lang_of(request)
     res = {"neu": 0, "aktualisiert": 0, "uebersprungen": [], "unbekannt": [], "angelegt": [], "ohne_zuordnung": 0}
     unknown = set()
     with db.connect() as con:
         for it in items:
-            label = it["title"] or it["uid"] or "(ohne Titel)"
+            label = it["title"] or it["uid"] or T(lang, "import.untitled")
             if it["skip"]:
-                res["uebersprungen"].append(f"{label}: {it['skip']}")
+                key, values = it["skip"]
+                res["uebersprungen"].append(f"{label}: {T(lang, key, **values)}")
                 continue
             note = it["note"]
             # Strecke: eigenes Feld bzw. „Strecke: …“ im Text, sonst LOCATION (ganz oder Teil vor dem ersten Komma)
@@ -1221,8 +1226,8 @@ def import_ics(data: IcsIn, request: Request, admin: User = Depends(admin_user))
                 tid = _ref_id(con, "tracks", it["location"], False, [])
             if tid is None and it["track"]:
                 loc_rest = it["location"].split(",", 1)[1].strip() if it["track_from_location"] and "," in it["location"] else ""
-                tid = _ref_id(con, "tracks", it["track"], data.create_refs, res["angelegt"], loc_rest)
-            oid = _ref_id(con, "organizers", it["organizer"], data.create_refs, res["angelegt"])
+                tid = _ref_id(con, "tracks", it["track"], data.create_refs, res["angelegt"], loc_rest, lang)
+            oid = _ref_id(con, "organizers", it["organizer"], data.create_refs, res["angelegt"], lang=lang)
             # Nichts Ausdrückliches gefunden → bekannte Namen in Titel, Beschreibung und Ort suchen
             text = f"{it['title']} {note} {it['location']}"
             if tid is None:
@@ -1230,9 +1235,9 @@ def import_ics(data: IcsIn, request: Request, admin: User = Depends(admin_user))
             if oid is None:
                 oid = _ref_in_text(_ref_keys(con, "organizers"), text)
             if tid is None and it["track"]:
-                unknown.add(f"Rennstrecke „{it['track']}“")
+                unknown.add(T(lang, "import.ref.track", name=it["track"]))
             if oid is None and it["organizer"]:
-                unknown.add(f"Veranstalter „{it['organizer']}“")
+                unknown.add(T(lang, "import.ref.organizer", name=it["organizer"]))
             if tid is None and it["location"]:              # Ort nicht verlieren, wenn er keiner Strecke zugeordnet ist
                 note = f"Ort: {it['location']}\n{note}".strip()
             if tid is None and oid is None:
@@ -1247,7 +1252,7 @@ def import_ics(data: IcsIn, request: Request, admin: User = Depends(admin_user))
                 existing = con.execute("SELECT id, visibility FROM events WHERE ics_uid = ?", (it["uid"][:300],)).fetchone()
             if existing is not None:
                 if existing["visibility"] != "public":
-                    res["uebersprungen"].append(f"{label}: gleiche UID gehört zu einem nicht öffentlichen Event")
+                    res["uebersprungen"].append(f"{label}: {T(lang, 'import.skip.uid_private')}")
                     continue
                 con.execute("UPDATE events SET title = ?, start_date = ?, end_date = ?, note = ?, "
                             "organizer_id = COALESCE(?, organizer_id), track_id = COALESCE(?, track_id), updated_at = datetime('now') WHERE id = ?",
@@ -1278,7 +1283,7 @@ class LogIn(BaseModel):
 @app.post("/api/log", dependencies=[Depends(_require_json)])
 def client_log(data: LogIn, request: Request, user: User = Depends(viewer)):
     if data.action not in CLIENT_ACTIONS:
-        raise HTTPException(400, "Unbekannte Aktion")
+        raise err(400, "err.unknown_action")
     if user.id == 0:                               # Besucher ohne Konto werden nicht protokolliert
         return {"ok": True}
     detail = data.detail
@@ -1360,13 +1365,13 @@ class ManagerIn(BaseModel):
 
 def _check_pw(pw: str) -> None:
     if len(pw) < MIN_PW:
-        raise HTTPException(400, f"Passwort muss mindestens {MIN_PW} Zeichen haben")
+        raise err(400, "err.pw_short", n=MIN_PW)
 
 
 def _get_user(con, user_id: int):
     row = con.execute("SELECT id, username, is_admin FROM users WHERE id = ?", (user_id,)).fetchone()
     if not row:
-        raise HTTPException(404, "Benutzer nicht gefunden")
+        raise err(404, "err.user_not_found")
     return row
 
 
@@ -1374,14 +1379,14 @@ def _get_user(con, user_id: int):
 def admin_add_user(data: NewUserIn, request: Request, admin: User = Depends(admin_user)):
     name = data.username.strip()
     if not NAME_RE.match(name):
-        raise HTTPException(400, "Name: 2–64 Zeichen, erlaubt sind A–Z, a–z, 0–9, Punkt, Unterstrich, Bindestrich")
+        raise err(400, "err.username_rule")
     _check_pw(data.password)
     email = _clean_email(data.email) if data.email.strip() else None
     with db.connect() as con:
         if con.execute("SELECT 1 FROM users WHERE username = ?", (name,)).fetchone():
-            raise HTTPException(409, f"Benutzer „{name}“ existiert bereits")
+            raise err(409, "err.user_exists", name=name)
         if email and con.execute("SELECT 1 FROM users WHERE email = ?", (email,)).fetchone():
-            raise HTTPException(409, "Diese E-Mail-Adresse gehört schon zu einem anderen Benutzer")
+            raise err(409, "err.email_taken")
         con.execute("INSERT INTO users (username, pw_hash, is_admin, email) VALUES (?, ?, ?, ?)",
                     (name, db.hash_password(data.password), int(data.is_admin), email))
     log(request, admin, "benutzer_angelegt", f"{name}{' (Admin)' if data.is_admin else ''}")
@@ -1405,7 +1410,7 @@ def admin_set_email(user_id: int, data: EmailIn, request: Request, admin: User =
     with db.connect() as con:
         u = _get_user(con, user_id)
         if email and con.execute("SELECT 1 FROM users WHERE email = ? AND id != ?", (email, user_id)).fetchone():
-            raise HTTPException(409, "Diese E-Mail-Adresse gehört schon zu einem anderen Benutzer")
+            raise err(409, "err.email_taken")
         con.execute("UPDATE users SET email = ? WHERE id = ?", (email, user_id))
     log(request, admin, "benutzer_email", f"{u['username']}: {'gesetzt' if email else 'entfernt'}")
     return {"ok": True}
@@ -1414,7 +1419,7 @@ def admin_set_email(user_id: int, data: EmailIn, request: Request, admin: User =
 @app.put("/api/admin/users/{user_id}/admin", dependencies=[Depends(_require_json)])
 def admin_set_flag(user_id: int, data: AdminFlagIn, request: Request, admin: User = Depends(admin_user)):
     if user_id == admin.id and not data.is_admin:
-        raise HTTPException(400, "Das eigene Admin-Recht kann man nicht entziehen")
+        raise err(400, "err.own_admin")
     with db.connect() as con:
         u = _get_user(con, user_id)
         con.execute("UPDATE users SET is_admin = ? WHERE id = ?", (int(data.is_admin), user_id))
@@ -1432,7 +1437,7 @@ def admin_set_manager(user_id: int, data: ManagerIn, request: Request, admin: Us
             found = {r["id"]: r["name"] for r in con.execute(
                 f"SELECT id, name FROM organizers WHERE id IN ({','.join('?' * len(ids))})", ids)}
             if len(found) != len(ids):
-                raise HTTPException(400, "Veranstalter nicht gefunden")
+                raise err(400, "err.organizer_not_found")
         else:
             found = {}
         con.execute("DELETE FROM organizer_managers WHERE user_id = ?", (user_id,))
@@ -1455,7 +1460,7 @@ def admin_logout_user(user_id: int, request: Request, admin: User = Depends(admi
 @app.delete("/api/admin/users/{user_id}", dependencies=[Depends(_require_json)])
 def admin_delete_user(user_id: int, request: Request, admin: User = Depends(admin_user)):
     if user_id == admin.id:
-        raise HTTPException(400, "Den eigenen Benutzer kann man nicht löschen")
+        raise err(400, "err.own_delete")
     with db.connect() as con:
         u = _get_user(con, user_id)
         con.execute("DELETE FROM events WHERE visibility = 'private' AND created_by = ?", (user_id,))
@@ -1512,7 +1517,7 @@ def _video_info() -> dict:
 @app.get("/media/{name}")
 def media_file(name: str):
     if name not in VIDEOS.values() or not (MEDIA / name).is_file():
-        raise HTTPException(404, "Nicht gefunden")
+        raise err(404, "err.not_found")
     return FileResponse(MEDIA / name, media_type="video/mp4", headers={"Cache-Control": "public, max-age=86400"})
 
 
@@ -1525,9 +1530,9 @@ def admin_videos(user: User = Depends(admin_user)):
 async def upload_video(kind: str, request: Request, user: User = Depends(admin_user)):
     # Rohdaten mit Content-Type video/mp4: fremde Seiten können das nicht ohne CORS-Freigabe senden
     if kind not in VIDEOS:
-        raise HTTPException(404, "Unbekanntes Video")
+        raise err(404, "err.unknown_video")
     if request.headers.get("content-type", "").split(";")[0].strip() != "video/mp4":
-        raise HTTPException(415, "Bitte eine MP4-Datei hochladen")
+        raise err(415, "err.mp4_required")
     MEDIA.mkdir(parents=True, exist_ok=True)
     tmp, size, head = MEDIA / f"{VIDEOS[kind]}.part", 0, b""
     try:
@@ -1535,12 +1540,12 @@ async def upload_video(kind: str, request: Request, user: User = Depends(admin_u
             async for chunk in request.stream():
                 size += len(chunk)
                 if size > MAX_VIDEO:
-                    raise HTTPException(413, f"Video ist größer als {MAX_VIDEO // (1024 * 1024)} MB")
+                    raise err(413, "err.video_too_big", n=MAX_VIDEO // (1024 * 1024))
                 if len(head) < 12:
                     head += chunk[:12]
                 f.write(chunk)
         if head[4:8] != b"ftyp":
-            raise HTTPException(415, "Das ist keine MP4-Datei")
+            raise err(415, "err.not_mp4")
         os.replace(tmp, MEDIA / VIDEOS[kind])
     finally:
         tmp.unlink(missing_ok=True)
@@ -1551,7 +1556,7 @@ async def upload_video(kind: str, request: Request, user: User = Depends(admin_u
 @app.delete("/api/admin/videos/{kind}", dependencies=[Depends(_require_json)])
 def delete_video(kind: str, request: Request, user: User = Depends(admin_user)):
     if kind not in VIDEOS:
-        raise HTTPException(404, "Unbekanntes Video")
+        raise err(404, "err.unknown_video")
     (MEDIA / VIDEOS[kind]).unlink(missing_ok=True)
     log(request, user, "video_entfernt", kind)
     return _video_info()

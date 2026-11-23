@@ -83,7 +83,7 @@ function renderYear() {
 
   const head = el("div", "year-head");
   head.append(el("div", "mlabel"));
-  for (let c = 0; c < COLS; c++) head.append(el("div", `wdh ${c % 7 >= 5 ? "we" : ""}`, WD_SHORT[c % 7]));
+  for (let c = 0; c < COLS; c++) head.append(el("div", `wdh ${c % 7 >= 5 ? "we" : ""}`, wdShort(c % 7)));
   root.append(head);
 
   const events = visibleEvents();
@@ -105,7 +105,7 @@ function renderYear() {
     row.style.gridTemplateRows = `var(--dayhead) repeat(${lanes}, var(--lane))`;
     const span = `1 / span ${lanes + 1}`;
 
-    const label = el("div", "mlabel", MONTHS[m]);
+    const label = el("div", "mlabel", monthName(m));
     label.style.gridRow = span;
     row.append(label);
 
@@ -124,10 +124,10 @@ function renderYear() {
         cell.dataset.date = dIso;
         cell.append(el("span", "dnum", String(day)));
         if (wd(dt) === 0 || day === 1) {
-          const kw = el("button", "kw", `KW${isoWeek(dt)}`);
+          const kw = el("button", "kw", t("week.short", { n: isoWeek(dt) }));
           kw.type = "button";
           kw.dataset.week = iso(mondayOf(dt));
-          kw.title = "Woche anzeigen";
+          kw.title = t("week.show");
           cell.append(kw);
         }
       }
@@ -158,7 +158,7 @@ function renderWeek() {
   root.replaceChildren();
   const mon = parse(state.week), sun = addDays(mon, 6);
   const mIso = iso(mon), sIso = iso(sun), todayIso = iso(new Date());
-  $("week-label").textContent = `KW ${isoWeek(mon)} · ${fmtShort(mon)} – ${fmtShort(sun)}${sun.getUTCFullYear()}`;
+  $("week-label").textContent = t("week.label", { n: isoWeek(mon), from: fmtShort(mon), to: fmtShortYear(sun) });
   const [minW, maxW] = weekBounds();
   $("btn-prev").disabled = mon <= minW;
   $("btn-next").disabled = mon >= maxW;
@@ -186,7 +186,7 @@ function renderWeek() {
     col.style.gridColumn = String(i + 1);
     col.style.gridRow = "1 / -1";
     const h = el("div", "whead");
-    h.append(el("span", "wname", WD_LONG[i]), el("span", "wdate", `${dt.getUTCDate()}. ${MONTHS[dt.getUTCMonth()]}`));
+    h.append(el("span", "wname", wdLong(i)), el("span", "wdate", t("date.day_month", { d: dt.getUTCDate(), month: monthName(dt.getUTCMonth()) })));
     if (hol) h.append(el("span", "whol", hol));
     col.append(h);
     grid.append(col);
@@ -197,12 +197,12 @@ function renderWeek() {
     const b = eventButton(ev, `big ${seg.contL ? "cont-l" : ""} ${seg.contR ? "cont-r" : ""}`);
     b.append(el("span", "meta cat-line", catName(ev)), el("strong", null, ev.title));
     const days = daysBetween(parse(ev.start_date), parse(ev.end_date)) + 1;
-    b.append(el("span", "meta", days > 1 ? `${fmtShort(parse(ev.start_date))} – ${fmtShort(parse(ev.end_date))} · ${days} Tage` : "1 Tag"));
+    b.append(el("span", "meta", days > 1 ? `${fmtShort(parse(ev.start_date))} – ${fmtShort(parse(ev.end_date))} · ${daysText(days)}` : daysText(1)));
     if (refText(ev)) b.append(el("span", "meta", refText(ev)));
     const gIn = groupNamesIn(ev, state.groups);
-    if (gIn.length) b.append(el("span", "meta", `Gruppe: ${gIn.join(", ")}`));
+    if (gIn.length) b.append(el("span", "meta", t("ev.group_short", { names: gIn.join(", ") })));
     if (ev.participants.length && ev.visibility !== "private") {
-      b.append(el("span", "meta", ev.participants.map((p) => `${p.username} (${p.status})`).join(", ")));
+      b.append(el("span", "meta", ev.participants.map((p) => `${p.username} (${statusText(p.status)})`).join(", ")));
     }
     if (ev.note) b.append(el("span", "meta note", ev.note));
     b.style.gridColumn = `${seg.s + 1} / span ${seg.e - seg.s + 1}`;
@@ -262,7 +262,7 @@ function refreshEventDialog() {
   $("ev-title").textContent = ev.title;
   const days = daysBetween(parse(ev.start_date), parse(ev.end_date)) + 1;
   $("ev-dates").textContent = days > 1
-    ? `${fmt(ev.start_date)} – ${fmt(ev.end_date)} (${days} Tage)` : fmt(ev.start_date);
+    ? `${fmt(ev.start_date)} – ${fmt(ev.end_date)} (${daysText(days)})` : fmt(ev.start_date);
   refLinks(ev, $("ev-refs"));
   groupParticipation(ev, state.groups, $("ev-groups"), setGroupParticipation);
   $("ev-note").textContent = ev.note;
@@ -278,10 +278,10 @@ function refreshEventDialog() {
   if (!ev.participants.length) ul.append(el("li", "muted", noPeopleText(ev)));
   for (const p of ev.participants) {
     const li = el("li");
-    li.append(el("span", null, p.username), el("span", `chip ${p.status}`, p.status));
+    li.append(el("span", null, p.username), el("span", `chip ${p.status}`, statusText(p.status)));
     ul.append(li);
   }
-  $("ev-creator").textContent = ev.creator && !priv ? `angelegt von ${ev.creator}` : "";
+  $("ev-creator").textContent = ev.creator && !priv ? t("ev.created_by", { name: ev.creator }) : "";
   $("ev-admin").hidden = !ev.can_edit;
 }
 
@@ -309,7 +309,7 @@ let editId = null;
 function openEdit(ev, start, end) {
   editId = ev ? ev.id : null;
   const f = $("edit-form");
-  $("edit-heading").textContent = ev ? "Event bearbeiten" : "Neues Event";
+  $("edit-heading").textContent = t(ev ? "ev.edit" : "ev.new");
   f.title.value = ev ? ev.title : "";
   f.start_date.value = ev ? ev.start_date : start;
   f.end_date.value = ev ? ev.end_date : (end || start);
@@ -336,7 +336,7 @@ $("edit-form").addEventListener("submit", async (e) => {
     organizer_id: refValue(f.organizer_id), track_id: refValue(f.track_id), ...visibilityBody(f.visibility) };
   const old = editId && state.events.find((x) => x.id === editId);
   if (old && old.participants.some((p) => p.username !== state.me.username) && catKey(old) !== f.visibility.value
-      && !confirm("Die Sichtbarkeit ändert sich. Wer das Event danach nicht mehr sieht, verliert seine Markierung. Fortfahren?")) return;
+      && !confirm(t("ev.confirm_vis"))) return;
   try {
     if (editId) await api("PUT", `/api/events/${editId}`, body);
     else await api("POST", "/api/events", body);
@@ -360,7 +360,7 @@ $("ev-edit").addEventListener("click", () => {
 });
 $("ev-delete").addEventListener("click", async () => {
   const ev = state.events.find((e) => e.id === state.openEventId);
-  if (!ev || !confirm(`„${ev.title}“ wirklich löschen? Alle Markierungen gehen verloren.`)) return;
+  if (!ev || !confirm(t("ev.confirm_delete", { title: ev.title }))) return;
   try {
     await api("DELETE", `/api/events/${ev.id}`);
     $("event-dialog").close();
@@ -441,24 +441,24 @@ function fillTip(ev) {
   tip.replaceChildren();
   tip.append(paint(el("span", "cat-badge", catName(ev)), ev), el("strong", null, ev.title));
   const days = daysBetween(parse(ev.start_date), parse(ev.end_date)) + 1;
-  tip.append(el("div", "tip-dates", days > 1 ? `${fmt(ev.start_date)} – ${fmt(ev.end_date)} (${days} Tage)` : fmt(ev.start_date)));
+  tip.append(el("div", "tip-dates", days > 1 ? `${fmt(ev.start_date)} – ${fmt(ev.end_date)} (${daysText(days)})` : fmt(ev.start_date)));
   if (refText(ev)) tip.append(el("div", "tip-dates", refText(ev)));
   const gIn = groupNamesIn(ev, state.groups);
-  if (gIn.length) tip.append(el("div", "tip-dates", `Gruppe nimmt teil: ${gIn.join(", ")}`));
+  if (gIn.length) tip.append(el("div", "tip-dates", t("ev.group_in", { names: gIn.join(", ") })));
   if (isGuest()) return;
   if (ev.visibility === "private") {
-    tip.append(el("div", "tip-empty", ev.my_status ? `Status: ${ev.my_status}` : "nur für dich sichtbar"));
+    tip.append(el("div", "tip-empty", ev.my_status ? t("status.line", { status: statusText(ev.my_status) }) : t("ev.only_you")));
     return;
   }
   for (const status of ["gebucht", "geplant"]) {
     const names = ev.participants.filter((p) => p.status === status).map((p) => p.username);
     if (!names.length) continue;
     const row = el("div", "tip-row");
-    row.append(el("span", `chip ${status}`, status), el("span", null, names.join(", ")));
+    row.append(el("span", `chip ${status}`, statusText(status)), el("span", null, names.join(", ")));
     tip.append(row);
   }
   if (!ev.participants.length) tip.append(el("div", "tip-empty", noPeopleText(ev)));
-  if (ev.creator) tip.append(el("div", "tip-empty", `angelegt von ${ev.creator}`));
+  if (ev.creator) tip.append(el("div", "tip-empty", t("ev.created_by", { name: ev.creator })));
 }
 
 function placeTip(x, y) {
@@ -527,13 +527,31 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("user
 setupIntro("desktop", { banner: $("intro"), thumb: $("intro-thumb"), play: $("intro-play"), close: $("intro-close"),
   buttons: [$("btn-intro")], dialog: $("video-dialog"), player: $("video-player") });
 
+/* ---------- Sprache: Texte, die das Skript selbst setzt ---------- */
+function applyTexts() {
+  state.holidays = holidays(state.year);
+  document.title = t("app.title_year", { year: state.year });
+  $("title").textContent = t("app.title_year", { year: state.year });
+  if (state.me?.guest) {
+    $("ev-guest").replaceChildren(guestHint());
+  }
+  if ($("edit-dialog").open) $("edit-heading").textContent = t(editId ? "ev.edit" : "ev.new");
+}
+
+// Sprachwechsel: alles, was gezeichnet wurde, neu aufbauen (Daten bleiben)
+document.addEventListener("i18n", () => {
+  if (!state.me) return;
+  applyTexts();
+  syncManagerMenu();
+  buildRefFilter($("rf"), state.groups, render);
+  render();
+  if ($("groups-dialog").open) buildGroupsPanel($("groups-panel"), state.groups, reloadAll);
+});
+
 /* ---------- Start ---------- */
 (async function init() {
-  state.me = await api("GET", "/api/me");
+  [state.me] = await Promise.all([api("GET", "/api/me"), textsReady]);
   state.year = state.me.year;
-  state.holidays = holidays(state.year);
-  document.title = `racingkalender.de ${state.year}`;
-  $("title").textContent = `racingkalender.de ${state.year}`;
   $("username").textContent = state.me.username;
   if (state.me.guest) {                                          // ohne Konto: nur ansehen
     await loadGuestCfg();
@@ -543,9 +561,9 @@ setupIntro("desktop", { banner: $("intro"), thumb: $("intro-thumb"), play: $("in
     $("btn-login").hidden = false;
     $("btn-register").hidden = !guestCfg.registration;
     document.querySelector("#event-dialog .status-buttons").hidden = true;
-    $("ev-guest").replaceChildren(guestHint());
     $("ev-guest").hidden = false;
   }
+  applyTexts();
   try { state.onlyMine = !state.me.guest && localStorage.getItem("kal-only-mine") === "1"; } catch {}
   $("only-mine").checked = state.onlyMine;
   loadCatFilter();

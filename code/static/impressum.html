@@ -3,54 +3,48 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Impressum · racingkalender.de</title>
+<title data-i18n="imprint.title">Impressum · racingkalender.de</title>
 <link rel="icon" href="data:,">
+<script src="/static/i18n.js"></script>
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body class="legal-body">
 <main class="legal">
-  <p class="legal-eyebrow"><a href="/">← racingkalender.de</a></p>
-  <h1>Impressum</h1>
+  <div class="legal-top">
+    <p class="legal-eyebrow"><a href="/" data-i18n="legal.back"></a></p>
+    <div class="lang" data-lang-switch></div>
+  </div>
+  <h1 data-i18n="imprint.h1"></h1>
+  <p class="legal-binding" data-i18n="legal.binding"></p>
 
-  <h2>Angaben gemäß § 5 DDG</h2>
+  <h2 data-i18n="imprint.ddg"></h2>
   <div class="legal-block">
     <p><strong data-legal="name">…</strong></p>
     <p data-legal="strasse">…</p>
     <p data-legal="plzOrt">…</p>
   </div>
 
-  <h2>Kontakt</h2>
+  <h2 data-i18n="imprint.contact"></h2>
   <div class="legal-block">
-    <p>E-Mail: <a data-legal-mailto href="#">…</a></p>
-    <p data-legal-row-for="telefon">Telefon: <span data-legal="telefon"></span></p>
+    <p data-i18n-html="legal.email"></p>
+    <p data-legal-row-for="telefon" data-i18n-html="imprint.phone"></p>
   </div>
 
-  <h2>Art des Angebots</h2>
+  <h2 data-i18n="imprint.kind"></h2>
   <p data-legal="betriebsart">…</p>
 
-  <h2>Verantwortlich für den Inhalt</h2>
-  <p><span data-legal="name">…</span>, Anschrift wie oben.</p>
+  <h2 data-i18n="imprint.responsible"></h2>
+  <p data-i18n-html="imprint.responsible.text"></p>
 
-  <h2>Haftung für Inhalte</h2>
-  <p>Die Inhalte dieser Seiten wurden mit Sorgfalt erstellt. Für Richtigkeit,
-     Vollständigkeit und Aktualität der Inhalte – insbesondere der Termine,
-     Veranstalter- und Streckenangaben – wird jedoch keine Gewähr übernommen.
-     Verbindlich sind allein die Angaben der jeweiligen Veranstalter.
-     Nutzerinnen und Nutzer können eigene Inhalte (private Termine,
-     Gruppen-Termine, Gruppennamen) anlegen; für diese Inhalte sind die
-     jeweiligen Nutzer verantwortlich. Rechtswidrige Inhalte werden nach
-     Kenntnisnahme entfernt – Hinweise gern an die oben genannte
-     E-Mail-Adresse.</p>
+  <h2 data-i18n="imprint.content"></h2>
+  <p data-i18n="imprint.content.text"></p>
 
-  <h2>Haftung für Links</h2>
-  <p>Diese Seite kann Links zu externen Websites Dritter enthalten (z. B. zu
-     Veranstaltern und Rennstrecken), auf deren Inhalte kein Einfluss besteht.
-     Für die Inhalte der verlinkten Seiten ist stets der jeweilige Anbieter
-     verantwortlich.</p>
+  <h2 data-i18n="imprint.links"></h2>
+  <p data-i18n="imprint.links.text"></p>
 
   <footer class="legal-foot">
     <span>racingkalender.de</span>
-    <span><a href="/static/impressum.html">Impressum</a> · <a href="/static/datenschutz.html">Datenschutz</a></span>
+    <span><a href="/static/impressum.html" data-i18n="foot.imprint"></a> · <a href="/static/datenschutz.html" data-i18n="foot.privacy"></a></span>
   </footer>
 </main>
 <script src="/static/legal.js"></script>
